@@ -1,7 +1,9 @@
 package com.rom.poa_firstapp.ui.screen.authentication.login
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -42,6 +45,7 @@ import com.airbnb.lottie.compose.LottieConstants
 import com.airbnb.lottie.compose.animateLottieCompositionAsState
 import com.airbnb.lottie.compose.rememberLottieComposition
 import com.rom.poa_firstapp.R
+import com.rom.poa_firstapp.ui.theme.loginColor
 import com.rom.poa_firstapp.ui.theme.primaryColor
 import com.rom.poa_firstapp.ui.theme.secondaryColor
 import com.rom.poa_firstapp.ui.theme.tertiaryColor
@@ -59,7 +63,7 @@ fun LoginScreen() {
     {
 //    lottie animation
         LottieAnimationWidget()
-// email input
+
         Spacer(modifier = Modifier.height(10.dp))
 //    simple message
         Text(
@@ -73,9 +77,51 @@ fun LoginScreen() {
         EmailPlace()
 // password input
         Spacer(modifier = Modifier.height(30.dp))
-        Password()
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(150.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "password ",
+            )
 
+            Text(
+                text = "Forgot password?",
+                color = secondaryColor,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.clickable {
+                    // TODO: Navigate to SignUp Screen
+                }
+            )
+
+        }
+        Spacer(modifier = Modifier.height(5.dp))
+                Password()
+
+        Spacer(modifier = Modifier.height(30.dp))
 //    button
+        LoginButton()
+
+        Row(
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Don't have an account? ",
+                color = loginColor
+            )
+
+            Text(
+                text = "Signup",
+                color = secondaryColor,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.clickable {
+                    // TODO: Navigate to SignUp Screen
+                }
+            )
+            Spacer(modifier = Modifier.height(12.dp),)
+        }
+
     }
 }
 
@@ -172,4 +218,21 @@ fun Password() {
 
 
     )
+}
+
+@Composable
+
+fun LoginButton(){
+
+    OutlinedButton(onClick = {}) {
+        Text(
+            text = "Login",
+            style = TextStyle(
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                color = tertiaryColor
+            )
+        )
+
+    }
 }

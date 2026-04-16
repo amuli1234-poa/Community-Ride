@@ -14,7 +14,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import com.rom.poa_firstapp.ui.screen.authentication.forgotpassword.ForgotPasswordScreen
 import com.rom.poa_firstapp.ui.screen.authentication.login.LoginScreen
+import com.rom.poa_firstapp.ui.screen.authentication.signup.SignupScreen
 import com.rom.poa_firstapp.ui.theme.Poa_firstappTheme
 
 class MainActivity : ComponentActivity() {
@@ -26,7 +28,7 @@ class MainActivity : ComponentActivity() {
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     content = {
-                        LoginScreen()
+                      ForgotPasswordScreen()
                     },
                 )
             }

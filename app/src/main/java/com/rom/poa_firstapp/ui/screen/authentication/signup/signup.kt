@@ -1,9 +1,12 @@
 package com.rom.poa_firstapp.ui.screen.authentication.signup
 
 import android.graphics.Paint
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -12,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -37,16 +41,18 @@ import com.airbnb.lottie.compose.LottieConstants
 import com.airbnb.lottie.compose.animateLottieCompositionAsState
 import com.airbnb.lottie.compose.rememberLottieComposition
 import com.rom.poa_firstapp.R
+import com.rom.poa_firstapp.ui.theme.loginColor
 import com.rom.poa_firstapp.ui.theme.primaryColor
 import com.rom.poa_firstapp.ui.theme.secondaryColor
 import com.rom.poa_firstapp.ui.theme.tertiaryColor
 
 @Composable
 
-fun SignupScreen(){
+fun SignupScreen() {
     Column(
         verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.fillMaxSize()
     ) {
 //        Lottie Animation
         LottieSignup()
@@ -60,36 +66,53 @@ fun SignupScreen(){
                 fontWeight = FontWeight.Bold
             )
         )
-    }
-    Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(20.dp))
 
-    FirstName()
+        FirstName()
 
-    Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
-    MiddleName()
-
-    Spacer(modifier = Modifier.height(20.dp))
-
-    LastName()
-
-    Spacer(modifier = Modifier.height(20.dp))
-
-    Text(
-        text = "Create A Strong Password",
-        style = TextStyle(
-            fontSize = 32.sp,
-            fontWeight = FontWeight.Bold
+        Text(
+            text = "Create A Strong Password",
+            style = TextStyle(
+                fontSize = 32.sp,
+                fontWeight = FontWeight.Bold
+            )
         )
-    )
 
-    Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(20.dp))
 
-    CreatePassword()
+        CreatePassword()
 
-    Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(20.dp))
 
-    ConfirmPassword()
+        ConfirmPassword()
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        SignUpButton()
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        Row(
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Already Have An Account? ",
+                color = loginColor
+            )
+
+            Text(
+                text = "Login",
+                color = secondaryColor,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.clickable {
+                    // TODO: Navigate to SignUp Screen
+                }
+            )
+        }
+    }
 
 }
 
@@ -107,7 +130,7 @@ fun LottieSignup() {
     LottieAnimation(
         composition = composition,
         progress = { progress },
-        Modifier.height(400.dp)
+        Modifier.height(250.dp)
     )
 }
 
@@ -127,57 +150,15 @@ fun FirstName() {
 
         shape = RoundedCornerShape(24.dp),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-        label = { Text(text = "Enter Your First Name") },
-        placeholder = { Text(text = "eg Peter") },
+        label = { Text(text = "Enter Your Full Name") },
+        placeholder = { Text(text = "eg Peter Amuli") },
         modifier = Modifier.fillMaxWidth()
 
     )
 }
 
 
-// The Middle name section
-@Composable
-fun MiddleName() {
-    var textInput by remember { mutableStateOf(TextFieldValue("")) }
-    OutlinedTextField(
-        value = textInput,
-        onValueChange = { textInput = it },
-        maxLines = 1,
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = tertiaryColor,
-            unfocusedBorderColor = primaryColor
-        ),
 
-        shape = RoundedCornerShape(24.dp),
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-        label = { Text(text = "Enter Your Middle Name") },
-        placeholder = { Text(text = "eg Amuli") },
-        modifier = Modifier.fillMaxWidth()
-
-    )
-}
-
-// The Last name Section
-@Composable
-fun LastName() {
-    var textInput by remember { mutableStateOf(TextFieldValue("")) }
-    OutlinedTextField(
-        value = textInput,
-        onValueChange = { textInput = it },
-        maxLines = 1,
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = tertiaryColor,
-            unfocusedBorderColor = primaryColor
-        ),
-
-        shape = RoundedCornerShape(24.dp),
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-        label = { Text(text = "Enter Your Last Name") },
-        placeholder = { Text(text = "eg Gift") },
-        modifier = Modifier.fillMaxWidth()
-
-    )
-}
 
 // the Create password Section
 
@@ -265,4 +246,22 @@ fun ConfirmPassword() {
 
 
     )
+}
+
+
+@Composable
+
+fun SignUpButton() {
+
+    OutlinedButton(onClick = {}) {
+        Text(
+            text = "Sign Up",
+            style = TextStyle(
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                color = tertiaryColor
+            )
+        )
+
+    }
 }
