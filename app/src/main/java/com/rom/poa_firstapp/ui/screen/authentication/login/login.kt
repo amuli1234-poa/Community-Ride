@@ -55,6 +55,8 @@ import kotlin.math.max
 @Composable
 
 fun LoginScreen() {
+    var passwordInput by remember { mutableStateOf(TextFieldValue("")) }
+    var isVisible by remember { mutableStateOf(false) }
     Column(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -182,6 +184,7 @@ fun TogglePassword(trailingIcon:String){
 @Composable
 fun Password() {
     var textInput by remember { mutableStateOf(TextFieldValue("")) }
+    var isVisible by remember { mutableStateOf(false) }
     OutlinedTextField(
         value = textInput,
         onValueChange = { textInput = it },
@@ -199,7 +202,7 @@ fun Password() {
         },
         trailingIcon = {
             IconButton(
-                onClick = {}
+                onClick = { isVisible = !isVisible}
             ) {
                 Icon(
                     imageVector = ImageVector.vectorResource(R.drawable.outline_visibility_off_24),
@@ -210,10 +213,11 @@ fun Password() {
 
         },
 
+
         shape = RoundedCornerShape(24.dp),
         label = { Text(text = " Enter Your Password") },
-        placeholder = { Text(text = "****************") },
-        visualTransformation = PasswordVisualTransformation(),
+        visualTransformation = if (!isVisible){ PasswordVisualTransformation() }else {
+            VisualTransformation.None},
         modifier = Modifier.fillMaxWidth()
 
 

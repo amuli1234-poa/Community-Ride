@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -152,9 +153,10 @@ fun FirstName() {
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
         label = { Text(text = "Enter Your Full Name") },
         placeholder = { Text(text = "eg Peter Amuli") },
-        modifier = Modifier.fillMaxWidth()
-
+        modifier = Modifier
+            .fillMaxWidth()
     )
+
 }
 
 
@@ -198,7 +200,8 @@ fun CreatePassword() {
         label = { Text(text = " Password") },
         placeholder = { Text(text = "****************") },
         visualTransformation = PasswordVisualTransformation(),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
 
 
     )
@@ -242,7 +245,9 @@ fun ConfirmPassword() {
         label = { Text(text = " Confirm Your Password") },
         placeholder = { Text(text = "****************") },
         visualTransformation = PasswordVisualTransformation(),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+
 
 
     )

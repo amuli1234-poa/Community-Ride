@@ -27,8 +27,8 @@ class MainActivity : ComponentActivity() {
             Poa_firstappTheme {
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
-                    content = {
-                      ForgotPasswordScreen()
+                    content = { innerPadding->
+             LoginScreen()
                     },
                 )
             }
