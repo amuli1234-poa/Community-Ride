@@ -34,6 +34,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.airbnb.lottie.compose.LottieAnimation
@@ -168,6 +169,7 @@ fun FirstName() {
 @Composable
 fun CreatePassword() {
     var textInput by remember { mutableStateOf(TextFieldValue("")) }
+    var isVisible by remember {mutableStateOf(value = false)}
     OutlinedTextField(
         value = textInput,
         onValueChange = { textInput = it },
@@ -185,7 +187,9 @@ fun CreatePassword() {
         },
         trailingIcon = {
             IconButton(
-                onClick = {}
+                onClick = {
+                    isVisible =! isVisible
+                }
             ) {
                 Icon(
                     imageVector = ImageVector.vectorResource(R.drawable.outline_visibility_off_24),
@@ -199,7 +203,7 @@ fun CreatePassword() {
         shape = RoundedCornerShape(24.dp),
         label = { Text(text = " Password") },
         placeholder = { Text(text = "****************") },
-        visualTransformation = PasswordVisualTransformation(),
+        visualTransformation = if (!isVisible) {PasswordVisualTransformation()}else VisualTransformation.None,
         modifier = Modifier
             .fillMaxWidth()
 
@@ -213,6 +217,7 @@ fun CreatePassword() {
 @Composable
 fun ConfirmPassword() {
     var textInput by remember { mutableStateOf(TextFieldValue("")) }
+    var Visible by remember {mutableStateOf(value = false)}
     OutlinedTextField(
         value = textInput,
         onValueChange = { textInput = it },
@@ -230,7 +235,7 @@ fun ConfirmPassword() {
         },
         trailingIcon = {
             IconButton(
-                onClick = {}
+                onClick = {Visible =! Visible}
             ) {
                 Icon(
                     imageVector = ImageVector.vectorResource(R.drawable.outline_visibility_off_24),
@@ -244,7 +249,7 @@ fun ConfirmPassword() {
         shape = RoundedCornerShape(24.dp),
         label = { Text(text = " Confirm Your Password") },
         placeholder = { Text(text = "****************") },
-        visualTransformation = PasswordVisualTransformation(),
+        visualTransformation = if (!Visible){PasswordVisualTransformation()} else VisualTransformation.None,
         modifier = Modifier
             .fillMaxWidth()
 

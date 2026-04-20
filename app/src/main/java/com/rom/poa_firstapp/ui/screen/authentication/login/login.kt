@@ -147,6 +147,7 @@ fun LottieAnimationWidget() {
 @Composable
 fun EmailPlace() {
     var textInput by remember { mutableStateOf(TextFieldValue("")) }
+
     OutlinedTextField(
         value = textInput,
         onValueChange = { textInput = it },

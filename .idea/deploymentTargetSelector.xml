@@ -4,10 +4,10 @@
     <selectionStates>
       <SelectionState runConfigName="app">
         <option name="selectionMode" value="DROPDOWN" />
-        <DropdownSelection timestamp="2026-04-15T12:38:27.859750095Z">
+        <DropdownSelection timestamp="2026-04-17T12:36:33.915305280Z">
           <Target type="DEFAULT_BOOT">
             <handle>
-              <DeviceId pluginId="LocalEmulator" identifier="path=/home/emobilis/.android/avd/safari_phone.avd" />
+              <DeviceId pluginId="PhysicalDevice" identifier="serial=R7AW9064DQN" />
             </handle>
           </Target>
         </DropdownSelection>

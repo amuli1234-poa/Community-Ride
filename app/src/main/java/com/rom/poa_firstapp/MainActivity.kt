@@ -13,14 +13,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import coil3.compose.AsyncImage
 import com.rom.poa_firstapp.ui.screen.authentication.forgotpassword.ForgotPasswordScreen
 import com.rom.poa_firstapp.ui.screen.authentication.login.LoginScreen
 import com.rom.poa_firstapp.ui.screen.authentication.signup.SignupScreen
+import com.rom.poa_firstapp.ui.screen.onboarding.OnboardingScreen
 import com.rom.poa_firstapp.ui.theme.Poa_firstappTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
@@ -28,7 +31,7 @@ class MainActivity : ComponentActivity() {
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     content = { innerPadding->
-             LoginScreen()
+                 OnboardingScreen()
                     },
                 )
             }

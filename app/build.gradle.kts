@@ -40,6 +40,8 @@ android {
 }
 
 dependencies {
+    implementation(libs.androidx.navigation.compose)
+    implementation(libs.androidx.core.splashscreen)
     implementation(libs.lottie.compose.v610)
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
