@@ -37,12 +37,14 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavHostController
 import com.airbnb.lottie.compose.LottieAnimation
 import com.airbnb.lottie.compose.LottieCompositionSpec
 import com.airbnb.lottie.compose.LottieConstants
 import com.airbnb.lottie.compose.animateLottieCompositionAsState
 import com.airbnb.lottie.compose.rememberLottieComposition
 import com.rom.poa_firstapp.R
+import com.rom.poa_firstapp.ui.navigation.ROUTES
 import com.rom.poa_firstapp.ui.theme.loginColor
 import com.rom.poa_firstapp.ui.theme.primaryColor
 import com.rom.poa_firstapp.ui.theme.secondaryColor
@@ -50,7 +52,7 @@ import com.rom.poa_firstapp.ui.theme.tertiaryColor
 
 @Composable
 
-fun SignupScreen() {
+fun SignupScreen(navController: NavHostController, modifier: Modifier) {
     Column(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -110,7 +112,7 @@ fun SignupScreen() {
                 color = secondaryColor,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.clickable {
-                    // TODO: Navigate to SignUp Screen
+                    navController.navigate(ROUTES.Login.name)
                 }
             )
         }

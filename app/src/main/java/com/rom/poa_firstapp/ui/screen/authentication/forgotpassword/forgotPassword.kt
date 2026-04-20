@@ -33,6 +33,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavHostController
 import com.rom.poa_firstapp.R
 import com.rom.poa_firstapp.ui.theme.loginColor
 import com.rom.poa_firstapp.ui.theme.primaryColor
@@ -41,7 +42,7 @@ import com.rom.poa_firstapp.ui.theme.tertiaryColor
 
 
 @Composable
-fun ForgotPasswordScreen() {
+fun ForgotPasswordScreen(navController: NavHostController, modifier: Modifier) {
     var email by remember { mutableStateOf("") }
 
     Column(

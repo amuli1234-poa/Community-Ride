@@ -18,9 +18,9 @@ fun AppNavigation(navController: NavHostController,modifier: Modifier){
         navController = navController,
         startDestination = ROUTES.Onboarding.name
     ) {
-        composable(ROUTES.Onboarding.name){OnboardingScreen()}
-        composable(ROUTES.Login.name){LoginScreen()}
-        composable(ROUTES.Signup.name){SignupScreen()}
-        composable(ROUTES.ForgotPassword.name){ForgotPasswordScreen()}
+        composable(ROUTES.Onboarding.name){OnboardingScreen(navController,modifier)}
+        composable(ROUTES.Login.name){LoginScreen(navController,modifier)}
+        composable(ROUTES.Signup.name){SignupScreen(navController,modifier)}
+        composable(ROUTES.ForgotPassword.name){ForgotPasswordScreen(navController,modifier)}
         }
     }

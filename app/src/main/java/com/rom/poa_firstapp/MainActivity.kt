@@ -14,7 +14,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.navigation.compose.rememberNavController
 import coil3.compose.AsyncImage
+import com.rom.poa_firstapp.ui.navigation.AppNavigation
 import com.rom.poa_firstapp.ui.screen.authentication.forgotpassword.ForgotPasswordScreen
 import com.rom.poa_firstapp.ui.screen.authentication.login.LoginScreen
 import com.rom.poa_firstapp.ui.screen.authentication.signup.SignupScreen
@@ -28,10 +30,11 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             Poa_firstappTheme {
+               val navController = rememberNavController()
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     content = { innerPadding->
-                 OnboardingScreen()
+                        AppNavigation(navController, modifier = Modifier.padding(innerPadding))
                     },
                 )
             }

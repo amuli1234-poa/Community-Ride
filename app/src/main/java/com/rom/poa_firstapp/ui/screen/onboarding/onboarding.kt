@@ -21,12 +21,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavHostController
 import coil3.compose.AsyncImage
+import com.rom.poa_firstapp.ui.navigation.ROUTES
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.yield
 
 @Composable
-fun OnboardingScreen() {
+fun OnboardingScreen(navController: NavHostController, modifier: Modifier) {
     val images = listOf(
         "https://images.pexels.com/photos/25749069/pexels-photo-25749069.jpeg",
         "https://images.pexels.com/photos/35440180/pexels-photo-35440180.jpeg",
@@ -80,7 +82,7 @@ fun OnboardingScreen() {
 
         // Get Started Button
         Button(
-            onClick = { /* TODO: Handle navigation */ },
+            onClick = {navController.navigate(ROUTES.Login.name) },
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 48.dp)

@@ -39,12 +39,14 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationCompat
+import androidx.navigation.NavHostController
 import com.airbnb.lottie.compose.LottieAnimation
 import com.airbnb.lottie.compose.LottieCompositionSpec
 import com.airbnb.lottie.compose.LottieConstants
 import com.airbnb.lottie.compose.animateLottieCompositionAsState
 import com.airbnb.lottie.compose.rememberLottieComposition
 import com.rom.poa_firstapp.R
+import com.rom.poa_firstapp.ui.navigation.ROUTES
 import com.rom.poa_firstapp.ui.theme.loginColor
 import com.rom.poa_firstapp.ui.theme.primaryColor
 import com.rom.poa_firstapp.ui.theme.secondaryColor
@@ -54,7 +56,7 @@ import kotlin.math.max
 
 @Composable
 
-fun LoginScreen() {
+fun LoginScreen(navController: NavHostController, modifier: Modifier) {
     var passwordInput by remember { mutableStateOf(TextFieldValue("")) }
     var isVisible by remember { mutableStateOf(false) }
     Column(
@@ -92,7 +94,7 @@ fun LoginScreen() {
                 color = secondaryColor,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.clickable {
-                    // TODO: Navigate to SignUp Screen
+                   navController.navigate(ROUTES.ForgotPassword.name)
                 }
             )
 
@@ -118,7 +120,7 @@ fun LoginScreen() {
                 color = secondaryColor,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.clickable {
-                    // TODO: Navigate to SignUp Screen
+                    navController.navigate(ROUTES.Signup.name)
                 }
             )
             Spacer(modifier = Modifier.height(12.dp),)
