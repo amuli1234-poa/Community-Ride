@@ -5,5 +5,5 @@ enum class ROUTES {
     Signup,
     ForgotPassword,
     Onboarding,
-
+    Home,
 }

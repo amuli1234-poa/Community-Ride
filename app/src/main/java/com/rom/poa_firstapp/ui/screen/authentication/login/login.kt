@@ -104,7 +104,9 @@ fun LoginScreen(navController: NavHostController, modifier: Modifier) {
 
         Spacer(modifier = Modifier.height(30.dp))
 //    button
-        LoginButton()
+        LoginButton(onClick = {
+            navController.navigate(ROUTES.Home.name)
+        })
 
         Row(
             horizontalArrangement = Arrangement.Center,
@@ -229,9 +231,9 @@ fun Password() {
 
 @Composable
 
-fun LoginButton(){
+fun LoginButton(onClick: () -> Unit = {}){
 
-    OutlinedButton(onClick = {}) {
+    OutlinedButton(onClick = onClick) {
         Text(
             text = "Login",
             style = TextStyle(

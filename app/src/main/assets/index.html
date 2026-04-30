@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Leaflet OpenStreetMap</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <!-- Font Awesome for custom icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" />
+    <style>
+        body { margin: 0; padding: 0; }
+        #map { width: 100vw; height: 100vh; }
+        /* Custom marker styles */
+        .custom-marker-icon {
+            background-color: white;
+            border-radius: 50%;
+            border: 2px solid;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            color: white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        .custom-marker-icon.green {
+            border-color: #4CAF50;
+            background-color: #4CAF50;
+        }
+        .custom-marker-icon.red {
+            border-color: #F44336;
+            background-color: #F44336;
+        }
+        .custom-marker-icon.yellow {
+            border-color: #FFC107;
+            background-color: #FFC107;
+        }
+        .custom-marker-icon.blue-dot {
+            border-color: #2196F3;
+            background-color: #2196F3;
+            width: 16px;
+            height: 16px;
+            font-size: 0;
+        }
+        .custom-marker-icon i {
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <script src="script.js"></script>
+</body>
+</html>
