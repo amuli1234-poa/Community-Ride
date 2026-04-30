@@ -6,4 +6,5 @@ enum class ROUTES {
     ForgotPassword,
     Onboarding,
     Home,
+    PostRide,
 }

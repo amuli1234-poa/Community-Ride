@@ -10,6 +10,7 @@ import com.rom.poa_firstapp.ui.screen.authentication.login.LoginScreen
 import com.rom.poa_firstapp.ui.screen.authentication.signup.SignupScreen
 import com.rom.poa_firstapp.ui.screen.onboarding.OnboardingScreen
 import com.rom.poa_firstapp.ui.screen.home.HomeScreen
+import com.rom.poa_firstapp.ui.screen.postRide.PostRideScreen
 
 @Composable
 fun AppNavigation(navController: NavHostController, modifier: Modifier){
@@ -22,5 +23,6 @@ fun AppNavigation(navController: NavHostController, modifier: Modifier){
         composable(ROUTES.Signup.name){SignupScreen(navController, modifier)}
         composable(ROUTES.ForgotPassword.name){ForgotPasswordScreen(navController, modifier)}
         composable(ROUTES.Home.name){HomeScreen(navController, modifier)}
+        composable(ROUTES.PostRide.name){PostRideScreen(navController)}
     }
 }
