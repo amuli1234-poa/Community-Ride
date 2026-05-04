@@ -6,12 +6,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
-    <!-- Font Awesome for custom icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
         body { margin: 0; padding: 0; }
-        #map { width: 100vw; height: 100vh; }
-        /* Custom marker styles */
+        #mapid { width: 100vw; height: 100vh; }
         .custom-marker-icon {
             background-color: white;
             border-radius: 50%;
@@ -25,32 +23,49 @@
             color: white;
             box-shadow: 0 2px 5px rgba(0,0,0,0.2);
         }
-        .custom-marker-icon.green {
-            border-color: #4CAF50;
-            background-color: #4CAF50;
-        }
-        .custom-marker-icon.red {
-            border-color: #F44336;
-            background-color: #F44336;
-        }
-        .custom-marker-icon.yellow {
-            border-color: #FFC107;
-            background-color: #FFC107;
-        }
-        .custom-marker-icon.blue-dot {
-            border-color: #2196F3;
-            background-color: #2196F3;
-            width: 16px;
-            height: 16px;
-            font-size: 0;
-        }
-        .custom-marker-icon i {
-            color: white;
-        }
+        .custom-marker-icon.green { border-color: #4CAF50; background-color: #4CAF50; }
+        .custom-marker-icon.red { border-color: #F44336; background-color: #F44336; }
+        .custom-marker-icon.yellow { border-color: #FFC107; background-color: #FFC107; }
+        .custom-marker-icon.blue-dot { border-color: #2196F3; background-color: #2196F3; width: 16px; height: 16px; }
     </style>
 </head>
 <body>
-    <div id="map"></div>
-    <script src="script.js"></script>
+<div id="mapid"></div>
+<script>
+    var mymap = L.map("mapid").setView([-1.286389, 36.817223], 12);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(mymap);
+
+    var icons = {
+        green: L.divIcon({ className: "custom-marker-icon green", html: '<i class="fa-solid fa-car"></i>', iconSize: [36, 36], iconAnchor: [18, 36] }),
+        red: L.divIcon({ className: "custom-marker-icon red", html: '<i class="fa-solid fa-car"></i>', iconSize: [36, 36], iconAnchor: [18, 36] }),
+        yellow: L.divIcon({ className: "custom-marker-icon yellow", html: '<i class="fa-solid fa-clock"></i>', iconSize: [36, 36], iconAnchor: [18, 36] }),
+        blue: L.divIcon({ className: "custom-marker-icon blue-dot", iconSize: [16, 16], iconAnchor: [8, 8] })
+    };
+
+    var rideMarkers = {};
+
+    function addOrUpdateRideMarker(id, lat, lng, name, seats, phone, status) {
+        var icon = icons[status] || icons.green;
+        if (rideMarkers[id]) {
+            rideMarkers[id].setLatLng([lat, lng]);
+        } else {
+            var marker = L.marker([lat, lng], {icon: icon}).addTo(mymap);
+            marker.on('click', function() {
+                // Call Kotlin interface to navigate to profile
+                if (window.Android) {
+                    window.Android.onMarkerClick(id, name, seats, phone, lat, lng, status);
+                }
+            });
+            rideMarkers[id] = marker;
+        }
+    }
+
+    // Geolocation
+    mymap.on("locationfound", function(e) {
+        L.marker(e.latlng, {icon: icons.blue}).addTo(mymap);
+        mymap.setView(e.latlng, 13);
+    });
+    mymap.locate({setView: true, watch: true});
+</script>
 </body>
 </html>

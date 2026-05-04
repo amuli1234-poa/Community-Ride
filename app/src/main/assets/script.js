@@ -22,10 +22,13 @@ function onLocationFound(e) {
     }
 
     currentLocationMarker = L.marker(latlng, {icon: blueDotIcon}).addTo(map)
-        .bindPopup("You are within " + radius + " meters from this point").openPopup();
+//        .bindPopup("You are within " + radius + " meters from this point").openPopup();
 
     L.circle(latlng, radius).addTo(map);
-    map.setView(latlng, 13);
+   if (!map._zoomInitialized) {
+       map.setView(latlng, 13);
+       map._zoomInitialized = true;
+   }
 }
 
 function onLocationError(e) {
@@ -35,8 +38,14 @@ function onLocationError(e) {
 map.on('locationfound', onLocationFound);
 map.on('locationerror', onLocationError);
 
-map.locate({setView: true, maxZoom: 16, watch: true, enableHighAccuracy: true});
-
+map.locate({
+    setView: true,
+    maxZoom: 16,
+    watch: true,
+    enableHighAccuracy: true,
+    maximumAge: 0,
+    timeout: 10000
+});
 // Function to add markers dynamically (e.g., from Android code)
 function addMarker(lat, lng, title, snippet) {
     var newMarker = L.marker([lat, lng]).addTo(map);

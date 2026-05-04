@@ -7,4 +7,5 @@ enum class ROUTES {
     Onboarding,
     Home,
     PostRide,
+    Profile,
 }

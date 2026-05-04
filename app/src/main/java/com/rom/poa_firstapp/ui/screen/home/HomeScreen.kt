@@ -1,7 +1,6 @@
 package com.rom.poa_firstapp.ui.screen.home
 
 import android.Manifest
-import android.R
 import android.content.pm.PackageManager
 import android.view.ViewGroup
 import android.webkit.GeolocationPermissions
@@ -44,8 +43,18 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
-import coil3.compose.AsyncImagePainter
 import com.rom.poa_firstapp.ui.navigation.ROUTES
+import com.rom.poa_firstapp.ui.common.LoadingState
+import com.rom.poa_firstapp.ui.common.ErrorState
+import com.rom.poa_firstapp.data.repository.ProfileRepositoryImpl
+import com.rom.poa_firstapp.data.repository.RideRepositoryImpl
+import com.rom.poa_firstapp.data.model.Ride
+import io.github.jan.supabase.realtime.decodeRecord
+import io.github.jan.supabase.realtime.PostgresAction
+import kotlinx.coroutines.flow.collect
+import com.rom.poa_firstapp.data.remote.SupabaseModule
+import kotlinx.coroutines.launch
+import android.webkit.JavascriptInterface
 
 // ─── Color tokens ───────────────────────────────────────────────
 private val GreenPrimary   = Color(0xFF2E7D32)
@@ -61,10 +70,10 @@ private val TextPrimary    = Color(0xFF1A1A1A)
 private val TextSecondary  = Color(0xFF5F5E5A)
 private val TextMuted      = Color(0xFF888780)
 private val DividerColor   = Color(0xFFE0E6D8)
-private val BottomCard   = Color(0xFF245AB9F9)
-private val HeaderColor   = Color(0xF9245AB9)
+private val BottomCard   = Color(0xFFE3F2FD)
+private val HeaderColor   = Color(0xFF1976D2)
 
-private val BottomNavigator    = Color(0xFF4F4A7EF4)
+private val BottomNavigator    = Color(0xFFF5F5F5)
 
 @Composable
 fun HomeScreen(navController: NavHostController, modifier: Modifier = Modifier) {
@@ -87,6 +96,13 @@ fun HomeScreen(navController: NavHostController, modifier: Modifier = Modifier) 
             )
         }
     }
+
+    val rideRepository = remember { RideRepositoryImpl(SupabaseModule.client) }
+    val profileRepository = remember { ProfileRepositoryImpl(SupabaseModule.client) }
+    val scope = rememberCoroutineScope()
+    
+    var isLoading by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
     Box(
         modifier = modifier
@@ -118,7 +134,26 @@ fun HomeScreen(navController: NavHostController, modifier: Modifier = Modifier) 
                             ViewGroup.LayoutParams.MATCH_PARENT,
                             ViewGroup.LayoutParams.MATCH_PARENT
                         )
-                        webViewClient = WebViewClient()
+                        webViewClient = object : WebViewClient() {
+                            override fun onPageFinished(view: WebView?, url: String?) {
+                                super.onPageFinished(view, url)
+                                scope.launch {
+                                    try {
+                                        val currentRides = rideRepository.getAllRides()
+                                        (context as? androidx.activity.ComponentActivity)?.runOnUiThread {
+                                            currentRides.forEach { ride ->
+                                                evaluateJavascript(
+                                                    "addOrUpdateRideMarker(\"${ride.id}\", \"${ride.rider_id}\", \"${ride.rider_name}\", ${ride.seats_left}, \"${ride.rider_phone}\", ${ride.start_lat}, ${ride.start_lng}, \"${ride.status}\");",
+                                                    null
+                                                )
+                                            }
+                                        }
+                                    } catch (e: Exception) {
+                                        // Handle initial fetch error
+                                    }
+                                }
+                            }
+                        }
                         settings.javaScriptEnabled = true
                         settings.setGeolocationEnabled(true)
                         settings.domStorageEnabled = true
@@ -138,7 +173,61 @@ fun HomeScreen(navController: NavHostController, modifier: Modifier = Modifier) 
                                 }
                             }
                         }
+
+                        addJavascriptInterface(object {
+                            @JavascriptInterface
+                            fun onMarkerClick(id: String, riderId: String, name: String, seats: Int, phone: String, lat: Double, lng: Double, status: String) {
+                                (context as? androidx.activity.ComponentActivity)?.runOnUiThread {
+                                    scope.launch {
+                                        isLoading = true
+                                        errorMessage = null
+                                        try {
+                                            val profile = profileRepository.getProfile(riderId)
+                                            if (profile != null) {
+                                                navController.currentBackStackEntry?.savedStateHandle?.set("profile", profile)
+                                                navController.navigate(ROUTES.Profile.name)
+                                            } else {
+                                                errorMessage = "Profile not found"
+                                            }
+                                        } catch (e: Exception) {
+                                            errorMessage = "Error loading profile: ${e.localizedMessage}"
+                                        } finally {
+                                            isLoading = false
+                                        }
+                                    }
+                                }
+                            }
+                        }, "Android")
+
                         loadUrl("file:///android_asset/index.html")
+
+                        scope.launch {
+                            rideRepository.getRidesFlow().collect { action ->
+                                (context as? androidx.activity.ComponentActivity)?.runOnUiThread {
+                                    when (action) {
+                                        is PostgresAction.Insert -> {
+                                            val ride = action.decodeRecord<Ride>()
+                                            evaluateJavascript(
+                                                "addOrUpdateRideMarker(\"${ride.id}\", \"${ride.rider_id}\", \"${ride.rider_name}\", ${ride.seats_left}, \"${ride.rider_phone}\", ${ride.start_lat}, ${ride.start_lng}, \"${ride.status}\");", null
+                                            )
+                                        }
+                                        is PostgresAction.Update -> {
+                                            val ride = action.decodeRecord<Ride>()
+                                            evaluateJavascript(
+                                                "addOrUpdateRideMarker(\"${ride.id}\", \"${ride.rider_id}\", \"${ride.rider_name}\", ${ride.seats_left}, \"${ride.rider_phone}\", ${ride.start_lat}, ${ride.start_lng}, \"${ride.status}\");", null
+                                            )
+                                        }
+                                        is PostgresAction.Delete -> {
+                                            val rideId = action.oldRecord["id"].toString()
+                                            evaluateJavascript(
+                                                "removeRideMarker(\"${rideId}\");", null
+                                            )
+                                        }
+                                        else -> {}
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             )
@@ -148,11 +237,22 @@ fun HomeScreen(navController: NavHostController, modifier: Modifier = Modifier) 
         Column(modifier = Modifier.fillMaxSize()) {
             TopAppBarSection(
                 onMenuClick = { /* TODO: Open drawer or menu */ },
-                onProfileClick = { /* TODO: Navigate to profile */ }
+                onProfileClick = { 
+                    // For now, let's navigate to a placeholder or current user profile if we had session
+                    // navController.navigate(ROUTES.Profile.name) 
+                }
             )
             RideStatusFilters()
             Spacer(modifier = Modifier.weight(1f))
             BottomSheet(navController = navController)
+        }
+
+        if (isLoading) {
+            LoadingState()
+        }
+
+        errorMessage?.let {
+            ErrorState(message = it)
         }
     }
 }
@@ -306,7 +406,7 @@ fun BottomSheet(navController: NavHostController) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
-            .background(color =BottomCard)
+            .background(color = BottomCard)
             .padding(top = 12.dp)
     ) {
         // Handle

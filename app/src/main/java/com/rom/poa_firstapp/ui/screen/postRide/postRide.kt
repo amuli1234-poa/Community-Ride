@@ -20,6 +20,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import com.rom.poa_firstapp.ui.theme.GreenPrimary
+import com.rom.poa_firstapp.data.model.Ride
+import com.rom.poa_firstapp.data.repository.RideRepositoryImpl
+import com.rom.poa_firstapp.data.remote.SupabaseModule
+import com.rom.poa_firstapp.ui.navigation.ROUTES
+import com.rom.poa_firstapp.ui.common.LoadingState
+import com.rom.poa_firstapp.ui.common.ErrorState
+import kotlinx.coroutines.launch
+import java.util.UUID
 
 // --- THEME COLORS FROM IMAGE ---
 private val PrimaryGreen = Color(0xFF4CAF50)
@@ -31,6 +39,14 @@ private val MutedText = Color(0xFF757575)
 @Composable
 fun PostRideScreen(navController: NavHostController) {
     var isPaidRide by remember { mutableStateOf(false) }
+    var pickupLocation by remember { mutableStateOf("") }
+    var destination by remember { mutableStateOf("") }
+    
+    val rideRepository = remember { RideRepositoryImpl(SupabaseModule.client) }
+    val scope = rememberCoroutineScope()
+    
+    var isLoading by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
     Scaffold(
         topBar = {
@@ -87,9 +103,21 @@ fun PostRideScreen(navController: NavHostController) {
                 )
 
                 // 3. INPUT FIELDS (Simplified style)
-                LocationInputField(label = "Pickup Location", placeholder = "Enter pickup location", icon = Icons.Default.LocationOn)
+                LocationInputField(
+                    label = "Pickup Location",
+                    placeholder = "Enter pickup location",
+                    icon = Icons.Default.LocationOn,
+                    value = pickupLocation,
+                    onValueChange = { pickupLocation = it }
+                )
                 Spacer(modifier = Modifier.height(16.dp))
-                LocationInputField(label = "Destination", placeholder = "Enter destination", icon = Icons.Default.Place)
+                LocationInputField(
+                    label = "Destination",
+                    placeholder = "Enter destination",
+                    icon = Icons.Default.Place,
+                    value = destination,
+                    onValueChange = { destination = it }
+                )
 
                 Spacer(modifier = Modifier.height(24.dp))
 
@@ -134,7 +162,34 @@ fun PostRideScreen(navController: NavHostController) {
 
                 // 6. MAIN ACTION BUTTON
                 Button(
-                    onClick = { },
+                    onClick = {
+                        scope.launch {
+                            isLoading = true
+                            errorMessage = null
+                            try {
+                                val ride = Ride(
+                                    id = UUID.randomUUID().toString(),
+                                    rider_id = "CURRENT_USER_ID", // Placeholder
+                                    rider_name = "Current User", // Placeholder
+                                    seats_left = 3,
+                                    rider_phone = "1234567890",
+                                    start_lat = 0.0, // Placeholder
+                                    start_lng = 0.0, // Placeholder
+                                    status = if (isPaidRide) "Paid" else "Free"
+                                )
+                                val success = rideRepository.postRide(ride)
+                                if (success) {
+                                    navController.navigate(ROUTES.Home.name)
+                                } else {
+                                    errorMessage = "Failed to post ride. Please try again."
+                                }
+                            } catch (e: Exception) {
+                                errorMessage = "Error: ${e.localizedMessage}"
+                            } finally {
+                                isLoading = false
+                            }
+                        }
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp),
@@ -149,14 +204,22 @@ fun PostRideScreen(navController: NavHostController) {
                 }
             }
         }
+        
+        if (isLoading) {
+            LoadingState()
+        }
+        
+        errorMessage?.let {
+            ErrorState(message = it)
+        }
     }
 }
 
 @Composable
-fun LocationInputField(label: String, placeholder: String, icon: ImageVector) {
+fun LocationInputField(label: String, placeholder: String, icon: ImageVector, value: String, onValueChange: (String) -> Unit) {
     OutlinedTextField(
-        value = "",
-        onValueChange = {},
+        value = value,
+        onValueChange = onValueChange,
         modifier = Modifier.fillMaxWidth(),
         label = { Text(label, color = PrimaryGreen, fontSize = 12.sp) },
         placeholder = { Text(placeholder) },
