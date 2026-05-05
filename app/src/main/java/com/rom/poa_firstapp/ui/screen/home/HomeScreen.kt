@@ -55,6 +55,7 @@ import kotlinx.coroutines.flow.collect
 import com.rom.poa_firstapp.data.remote.SupabaseModule
 import kotlinx.coroutines.launch
 import android.webkit.JavascriptInterface
+import io.github.jan.supabase.auth.auth
 
 // ─── Color tokens ───────────────────────────────────────────────
 private val GreenPrimary   = Color(0xFF2E7D32)
@@ -103,6 +104,11 @@ fun HomeScreen(navController: NavHostController, modifier: Modifier = Modifier) 
     
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    val navigateToProfile = { uid: String? ->
+        navController.currentBackStackEntry?.savedStateHandle?.set("profileId", uid)
+        navController.navigate(ROUTES.Profile.name)
+    }
 
     Box(
         modifier = modifier
@@ -178,23 +184,7 @@ fun HomeScreen(navController: NavHostController, modifier: Modifier = Modifier) 
                             @JavascriptInterface
                             fun onMarkerClick(id: String, riderId: String, name: String, seats: Int, phone: String, lat: Double, lng: Double, status: String) {
                                 (context as? androidx.activity.ComponentActivity)?.runOnUiThread {
-                                    scope.launch {
-                                        isLoading = true
-                                        errorMessage = null
-                                        try {
-                                            val profile = profileRepository.getProfile(riderId)
-                                            if (profile != null) {
-                                                navController.currentBackStackEntry?.savedStateHandle?.set("profile", profile)
-                                                navController.navigate(ROUTES.Profile.name)
-                                            } else {
-                                                errorMessage = "Profile not found"
-                                            }
-                                        } catch (e: Exception) {
-                                            errorMessage = "Error loading profile: ${e.localizedMessage}"
-                                        } finally {
-                                            isLoading = false
-                                        }
-                                    }
+                                    navigateToProfile(riderId)
                                 }
                             }
                         }, "Android")
@@ -237,14 +227,11 @@ fun HomeScreen(navController: NavHostController, modifier: Modifier = Modifier) 
         Column(modifier = Modifier.fillMaxSize()) {
             TopAppBarSection(
                 onMenuClick = { /* TODO: Open drawer or menu */ },
-                onProfileClick = { 
-                    // For now, let's navigate to a placeholder or current user profile if we had session
-                    // navController.navigate(ROUTES.Profile.name) 
-                }
+                onProfileClick = { navigateToProfile(null) }
             )
             RideStatusFilters()
             Spacer(modifier = Modifier.weight(1f))
-            BottomSheet(navController = navController)
+            BottomSheet(navController = navController, onProfileClick = { navigateToProfile(null) })
         }
 
         if (isLoading) {
@@ -401,7 +388,7 @@ fun FilterChip(
 
 // ── Bottom Sheet ───────────────────────────────────────────────────
 @Composable
-fun BottomSheet(navController: NavHostController) {
+fun BottomSheet(navController: NavHostController, onProfileClick: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -447,7 +434,7 @@ fun BottomSheet(navController: NavHostController) {
             Spacer(modifier = Modifier.height(6.dp))
         }
 
-        BottomNavigationBar(navController = navController)
+        BottomNavigationBar(navController = navController, onProfileClick = onProfileClick)
     }
 }
 
@@ -568,7 +555,7 @@ fun SafeSimpleTogetherCard() {
 
 // ── Bottom Navigation ──────────────────────────────────────────────
 @Composable
-fun BottomNavigationBar(navController: NavHostController) {
+fun BottomNavigationBar(navController: NavHostController, onProfileClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -598,13 +585,13 @@ fun BottomNavigationBar(navController: NavHostController) {
             icon = Icons.Default.Email,
             label = "Messages",
             isSelected = false,
-            onClick = { /* TODO: Navigate to Messages */ }
+            onClick = { navController.navigate(ROUTES.Messages.name) }
         )
         BottomNavItem(
             icon = Icons.Default.AccountCircle,
             label = "Profile",
             isSelected = false,
-            onClick = { /* TODO: Navigate to Profile */ }
+            onClick = onProfileClick
         )
     }
 }

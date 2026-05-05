@@ -28,12 +28,16 @@ import com.rom.poa_firstapp.ui.common.LoadingState
 import com.rom.poa_firstapp.ui.common.ErrorState
 import kotlinx.coroutines.launch
 import java.util.UUID
+import io.github.jan.supabase.auth.auth
+import com.rom.poa_firstapp.data.repository.ProfileRepositoryImpl
 
 // --- THEME COLORS FROM IMAGE ---
 private val PrimaryGreen = Color(0xFF4CAF50)
 private val DarkGreen = Color(0xFF2E7D32)
 private val LightGreenBG = Color(0xFFF1F8F1)
 private val MutedText = Color(0xFF757575)
+
+// ... (existing code)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -43,6 +47,7 @@ fun PostRideScreen(navController: NavHostController) {
     var destination by remember { mutableStateOf("") }
     
     val rideRepository = remember { RideRepositoryImpl(SupabaseModule.client) }
+    val profileRepository = remember { ProfileRepositoryImpl(SupabaseModule.client) }
     val scope = rememberCoroutineScope()
     
     var isLoading by remember { mutableStateOf(false) }
@@ -167,12 +172,24 @@ fun PostRideScreen(navController: NavHostController) {
                             isLoading = true
                             errorMessage = null
                             try {
+                                val currentUser = SupabaseModule.client.auth.currentUserOrNull()
+                                if (currentUser == null) {
+                                    errorMessage = "Please login to post a ride"
+                                    return@launch
+                                }
+                                
+                                val profile = profileRepository.getProfile(currentUser.id)
+                                if (profile == null) {
+                                    errorMessage = "Profile not found"
+                                    return@launch
+                                }
+
                                 val ride = Ride(
                                     id = UUID.randomUUID().toString(),
-                                    rider_id = "CURRENT_USER_ID", // Placeholder
-                                    rider_name = "Current User", // Placeholder
+                                    rider_id = currentUser.id,
+                                    rider_name = profile.full_name,
                                     seats_left = 3,
-                                    rider_phone = "1234567890",
+                                    rider_phone = profile.phone_number ?: "0000000000",
                                     start_lat = 0.0, // Placeholder
                                     start_lng = 0.0, // Placeholder
                                     status = if (isPaidRide) "Paid" else "Free"

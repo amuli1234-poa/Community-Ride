@@ -8,4 +8,5 @@ enum class ROUTES {
     Home,
     PostRide,
     Profile,
+    Messages,
 }

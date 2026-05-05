@@ -12,13 +12,18 @@ import com.rom.poa_firstapp.ui.screen.onboarding.OnboardingScreen
 import com.rom.poa_firstapp.ui.screen.home.HomeScreen
 import com.rom.poa_firstapp.ui.screen.postRide.PostRideScreen
 import com.rom.poa_firstapp.ui.screen.profile.RiderProfileScreen
+import com.rom.poa_firstapp.ui.screen.messages.MessagesScreen
 import com.rom.poa_firstapp.data.model.RiderProfile
 
 @Composable
-fun AppNavigation(navController: NavHostController, modifier: Modifier){
+fun AppNavigation(
+    navController: NavHostController,
+    modifier: Modifier,
+    startDestination: String = ROUTES.Onboarding.name
+){
     NavHost(
         navController = navController,
-        startDestination = ROUTES.Onboarding.name
+        startDestination = startDestination
     ) {
         composable(ROUTES.Onboarding.name){OnboardingScreen(navController, modifier)}
         composable(ROUTES.Login.name){LoginScreen(navController, modifier)}
@@ -27,10 +32,14 @@ fun AppNavigation(navController: NavHostController, modifier: Modifier){
         composable(ROUTES.Home.name){HomeScreen(navController, modifier)}
         composable(ROUTES.PostRide.name){PostRideScreen(navController)}
         composable(ROUTES.Profile.name) {
-            val profile = navController.previousBackStackEntry?.savedStateHandle?.get<RiderProfile>("profile")
-            if (profile != null) {
-                RiderProfileScreen(profile = profile, onBack = { navController.popBackStack() })
-            }
+            val profileId = navController.currentBackStackEntry?.savedStateHandle?.get<String>("profileId")
+            RiderProfileScreen(
+                profileId = profileId,
+                onBack = { navController.popBackStack() }
+            )
+        }
+        composable(ROUTES.Messages.name) {
+            MessagesScreen(onBack = { navController.popBackStack() })
         }
     }
 }

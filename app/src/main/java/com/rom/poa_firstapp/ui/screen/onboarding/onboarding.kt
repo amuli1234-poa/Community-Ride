@@ -30,6 +30,11 @@ import com.rom.poa_firstapp.R
 import com.rom.poa_firstapp.ui.navigation.ROUTES
 import kotlinx.coroutines.launch
 
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.rom.poa_firstapp.data.remote.SupabaseModule
+import com.rom.poa_firstapp.data.repository.AuthRepositoryImpl
+import com.rom.poa_firstapp.ui.screen.authentication.AuthViewModel
+
 // ─── Design Tokens ────────────────────────────────────────────────────────────
 
 private val DeepSpace    = Color(0xFF080B1A)
@@ -108,8 +113,19 @@ private val pages = listOf(
 @Composable
 fun OnboardingScreen(
     navController: NavHostController,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    authViewModel: AuthViewModel = viewModel {
+        AuthViewModel(AuthRepositoryImpl(SupabaseModule.client))
+    }
 ) {
+    LaunchedEffect(Unit) {
+        if (authViewModel.isUserLoggedIn()) {
+            navController.navigate(ROUTES.Home.name) {
+                popUpTo(ROUTES.Onboarding.name) { inclusive = true }
+            }
+        }
+    }
+
     val pagerState = rememberPagerState(
         initialPage = 0,
         pageCount = { pages.size }

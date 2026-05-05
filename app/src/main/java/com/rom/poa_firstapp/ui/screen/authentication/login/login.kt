@@ -32,6 +32,13 @@ import com.airbnb.lottie.compose.*
 import com.rom.poa_firstapp.R
 import com.rom.poa_firstapp.ui.navigation.ROUTES
 
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.rom.poa_firstapp.data.remote.SupabaseModule
+import com.rom.poa_firstapp.data.repository.AuthRepositoryImpl
+import com.rom.poa_firstapp.ui.screen.authentication.AuthViewModel
+import com.rom.poa_firstapp.ui.common.LoadingState
+import com.rom.poa_firstapp.ui.common.ErrorState
+
 // ─── Private Design Tokens ────────────────────────────────────────────────────
 
 private val DeepSpace       = Color(0xFF080B1A)
@@ -74,8 +81,22 @@ private val OrbGradient2 = Brush.radialGradient(
 @Composable
 fun LoginScreen(
     navController: NavHostController,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    authViewModel: AuthViewModel = viewModel {
+        AuthViewModel(AuthRepositoryImpl(SupabaseModule.client))
+    }
 ) {
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+
+    LaunchedEffect(authViewModel.isSuccess) {
+        if (authViewModel.isSuccess) {
+            navController.navigate(ROUTES.Home.name) {
+                popUpTo(ROUTES.Login.name) { inclusive = true }
+            }
+        }
+    }
+
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -164,7 +185,7 @@ fun LoginScreen(
                     // Email
                     FieldLabel(text = "Email Address")
                     Spacer(Modifier.height(5.dp))
-                    CompactEmailField()
+                    CompactEmailField(value = email, onValueChange = { email = it })
 
                     Spacer(Modifier.height(14.dp))
 
@@ -191,7 +212,7 @@ fun LoginScreen(
                     }
 
                     Spacer(Modifier.height(5.dp))
-                    CompactPasswordField()
+                    CompactPasswordField(value = password, onValueChange = { password = it })
 
                     Spacer(Modifier.height(22.dp))
 
@@ -202,7 +223,11 @@ fun LoginScreen(
                             .height(50.dp)
                             .clip(RoundedCornerShape(50))
                             .background(ButtonGradient)
-                            .clickable { navController.navigate(ROUTES.Home.name) },
+                            .clickable { 
+                                if (email.isNotEmpty() && password.isNotEmpty()) {
+                                    authViewModel.signIn(email, password)
+                                }
+                            },
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
@@ -265,6 +290,14 @@ fun LoginScreen(
                 }
             }
         }
+
+        if (authViewModel.isLoading) {
+            LoadingState()
+        }
+
+        authViewModel.errorMessage?.let {
+            ErrorState(message = it)
+        }
     }
 }
 
@@ -308,12 +341,10 @@ private fun sharedFieldColors() = OutlinedTextFieldDefaults.colors(
 // ─── Email Field ──────────────────────────────────────────────────────────────
 
 @Composable
-fun CompactEmailField() {
-    var text by remember { mutableStateOf(TextFieldValue("")) }
-
+fun CompactEmailField(value: String, onValueChange: (String) -> Unit) {
     OutlinedTextField(
-        value         = text,
-        onValueChange = { text = it },
+        value         = value,
+        onValueChange = onValueChange,
         singleLine    = true,
         colors        = sharedFieldColors(),
         leadingIcon   = {
@@ -338,13 +369,12 @@ fun CompactEmailField() {
 // ─── Password Field ───────────────────────────────────────────────────────────
 
 @Composable
-fun CompactPasswordField() {
-    var text      by remember { mutableStateOf(TextFieldValue("")) }
+fun CompactPasswordField(value: String, onValueChange: (String) -> Unit) {
     var isVisible by remember { mutableStateOf(false) }
 
     OutlinedTextField(
-        value         = text,
-        onValueChange = { text = it },
+        value         = value,
+        onValueChange = onValueChange,
         singleLine    = true,
         colors        = sharedFieldColors(),
         leadingIcon   = {
@@ -361,7 +391,7 @@ fun CompactPasswordField() {
             ) {
                 Icon(
                     imageVector = ImageVector.vectorResource(
-                        if (isVisible) R.drawable.outline_visibility_off_24
+                        if (isVisible) R.drawable.outline_visibility_24
                         else           R.drawable.outline_visibility_off_24
                     ),
                     contentDescription = if (isVisible) "Hide" else "Show",

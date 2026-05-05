@@ -28,10 +28,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.*
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.airbnb.lottie.compose.*
 import com.rom.poa_firstapp.R
+import com.rom.poa_firstapp.data.remote.SupabaseModule
+import com.rom.poa_firstapp.data.repository.AuthRepositoryImpl
+import com.rom.poa_firstapp.ui.common.ErrorState
+import com.rom.poa_firstapp.ui.common.LoadingState
 import com.rom.poa_firstapp.ui.navigation.ROUTES
+import com.rom.poa_firstapp.ui.screen.authentication.AuthViewModel
 
 // ─── Private Design Tokens ────────────────────────────────────────────────────
 
@@ -75,8 +81,25 @@ private val OrbGradient2 = Brush.radialGradient(
 @Composable
 fun SignupScreen(
     navController: NavHostController,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    authViewModel: AuthViewModel = viewModel {
+        AuthViewModel(AuthRepositoryImpl(SupabaseModule.client))
+    }
 ) {
+    var fullName by remember { mutableStateOf("") }
+    var username by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") }
+
+    LaunchedEffect(authViewModel.isSuccess) {
+        if (authViewModel.isSuccess) {
+            navController.navigate(ROUTES.Home.name) {
+                popUpTo(ROUTES.Signup.name) { inclusive = true }
+            }
+        }
+    }
+
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -166,35 +189,43 @@ fun SignupScreen(
                     // Full Name
                     SignupFieldLabel(text = "Full Name")
                     Spacer(Modifier.height(5.dp))
-                    SignupFullNameField()
+                    SignupFullNameField(value = fullName, onValueChange = { fullName = it })
 
                     Spacer(Modifier.height(14.dp))
 
                     // Username
                     SignupFieldLabel(text = "Username")
                     Spacer(Modifier.height(5.dp))
-                    SignupUsernameField()
+                    SignupUsernameField(value = username, onValueChange = { username = it })
 
                     Spacer(Modifier.height(14.dp))
 
                     // Email
                     SignupFieldLabel(text = "Email Address")
                     Spacer(Modifier.height(5.dp))
-                    SignupEmailField()
+                    SignupEmailField(value = email, onValueChange = { email = it })
 
                     Spacer(Modifier.height(14.dp))
 
                     // Password
                     SignupFieldLabel(text = "Password")
                     Spacer(Modifier.height(5.dp))
-                    SignupPasswordField(placeholder = "Create a password")
+                    SignupPasswordField(
+                        value = password,
+                        onValueChange = { password = it },
+                        placeholder = "Create a password"
+                    )
 
                     Spacer(Modifier.height(14.dp))
 
                     // Confirm Password
                     SignupFieldLabel(text = "Confirm Password")
                     Spacer(Modifier.height(5.dp))
-                    SignupPasswordField(placeholder = "Repeat your password")
+                    SignupPasswordField(
+                        value = confirmPassword,
+                        onValueChange = { confirmPassword = it },
+                        placeholder = "Repeat your password"
+                    )
 
                     Spacer(Modifier.height(22.dp))
 
@@ -205,7 +236,11 @@ fun SignupScreen(
                             .height(50.dp)
                             .clip(RoundedCornerShape(50))
                             .background(ButtonGradient)
-                            .clickable { navController.navigate(ROUTES.Home.name) },
+                            .clickable {
+                                if (fullName.isNotEmpty() && username.isNotEmpty() && email.isNotEmpty() && password.isNotEmpty() && password == confirmPassword) {
+                                    authViewModel.signUp(email, password, fullName, username)
+                                }
+                            },
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
@@ -268,6 +303,14 @@ fun SignupScreen(
                 }
             }
         }
+
+        if (authViewModel.isLoading) {
+            LoadingState()
+        }
+
+        authViewModel.errorMessage?.let {
+            ErrorState(message = it)
+        }
     }
 }
 
@@ -311,11 +354,10 @@ private fun signupFieldColors() = OutlinedTextFieldDefaults.colors(
 // ─── Full Name Field ──────────────────────────────────────────────────────────
 
 @Composable
-private fun SignupFullNameField() {
-    var text by remember { mutableStateOf(TextFieldValue("")) }
+private fun SignupFullNameField(value: String, onValueChange: (String) -> Unit) {
     OutlinedTextField(
-        value         = text,
-        onValueChange = { text = it },
+        value         = value,
+        onValueChange = onValueChange,
         singleLine    = true,
         colors        = signupFieldColors(),
         leadingIcon   = {
@@ -325,7 +367,7 @@ private fun SignupFullNameField() {
                 modifier           = Modifier.size(18.dp)
             )
         },
-        placeholder     = { Text("John Doe", fontSize = 13.sp) },
+        placeholder     = { Text("Peter Amuli", fontSize = 13.sp) },
         shape           = RoundedCornerShape(14.dp),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
         textStyle       = TextStyle(fontSize = 14.sp),
@@ -336,11 +378,10 @@ private fun SignupFullNameField() {
 // ─── Username Field ───────────────────────────────────────────────────────────
 
 @Composable
-private fun SignupUsernameField() {
-    var text by remember { mutableStateOf(TextFieldValue("")) }
+private fun SignupUsernameField(value: String, onValueChange: (String) -> Unit) {
     OutlinedTextField(
-        value         = text,
-        onValueChange = { text = it },
+        value         = value,
+        onValueChange = onValueChange,
         singleLine    = true,
         colors        = signupFieldColors(),
         leadingIcon   = {
@@ -365,11 +406,10 @@ private fun SignupUsernameField() {
 // ─── Email Field ──────────────────────────────────────────────────────────────
 
 @Composable
-private fun SignupEmailField() {
-    var text by remember { mutableStateOf(TextFieldValue("")) }
+private fun SignupEmailField(value: String, onValueChange: (String) -> Unit) {
     OutlinedTextField(
-        value         = text,
-        onValueChange = { text = it },
+        value         = value,
+        onValueChange = onValueChange,
         singleLine    = true,
         colors        = signupFieldColors(),
         leadingIcon   = {
@@ -390,12 +430,11 @@ private fun SignupEmailField() {
 // ─── Password Field ───────────────────────────────────────────────────────────
 
 @Composable
-private fun SignupPasswordField(placeholder: String) {
-    var text      by remember { mutableStateOf(TextFieldValue("")) }
+private fun SignupPasswordField(value: String, onValueChange: (String) -> Unit, placeholder: String) {
     var isVisible by remember { mutableStateOf(false) }
     OutlinedTextField(
-        value         = text,
-        onValueChange = { text = it },
+        value         = value,
+        onValueChange = onValueChange,
         singleLine    = true,
         colors        = signupFieldColors(),
         leadingIcon   = {
@@ -412,7 +451,7 @@ private fun SignupPasswordField(placeholder: String) {
             ) {
                 Icon(
                     imageVector = ImageVector.vectorResource(
-                        if (isVisible) R.drawable.outline_visibility_off_24
+                        if (isVisible) R.drawable.outline_visibility_24
                         else           R.drawable.outline_visibility_off_24
                     ),
                     contentDescription = if (isVisible) "Hide" else "Show",
@@ -434,7 +473,7 @@ private fun SignupPasswordField(placeholder: String) {
 @Composable
 fun SignupLottieWidget() {
     val composition by rememberLottieComposition(
-        LottieCompositionSpec.RawRes(R.raw.signup)   // swap for your signup animation
+        LottieCompositionSpec.RawRes(R.raw.signup)
     )
     val progress by animateLottieCompositionAsState(
         composition,

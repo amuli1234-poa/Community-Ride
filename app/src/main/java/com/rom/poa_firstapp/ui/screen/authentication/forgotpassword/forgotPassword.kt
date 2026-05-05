@@ -30,6 +30,12 @@ import androidx.navigation.NavHostController
 import com.airbnb.lottie.compose.*
 import com.rom.poa_firstapp.R
 import com.rom.poa_firstapp.ui.navigation.ROUTES
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.rom.poa_firstapp.data.remote.SupabaseModule
+import com.rom.poa_firstapp.data.repository.AuthRepositoryImpl
+import com.rom.poa_firstapp.ui.screen.authentication.AuthViewModel
+import com.rom.poa_firstapp.ui.common.LoadingState
+import com.rom.poa_firstapp.ui.common.ErrorState
 
 // ─── Private Design Tokens ────────────────────────────────────────────────────
 
@@ -71,16 +77,26 @@ private val OrbGradient2 = Brush.radialGradient(
 @Composable
 fun ForgotPasswordScreen(
     navController: NavHostController,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    authViewModel: AuthViewModel = viewModel {
+        AuthViewModel(AuthRepositoryImpl(SupabaseModule.client))
+    }
 ) {
     // Tracks whether the reset email was sent
     var emailSent by remember { mutableStateOf(false) }
+
+    LaunchedEffect(authViewModel.isSuccess) {
+        if (authViewModel.isSuccess) {
+            emailSent = true
+        }
+    }
 
     Box(
         modifier = modifier
             .fillMaxSize()
             .background(BackgroundGradient)
     ) {
+        // ... (rest of the Box content remains the same)
 
         // Background glow orbs
         Box(
@@ -162,9 +178,7 @@ fun ForgotPasswordScreen(
             ) {
                 if (!emailSent) {
                     // ── Request reset state ────────────────────────────────
-                    ForgotRequestContent(
-                        onSend = { emailSent = true }
-                    )
+                    ForgotRequestContent(authViewModel = authViewModel)
                 } else {
                     // ── Confirmation state ─────────────────────────────────
                     ForgotConfirmationContent(
@@ -199,13 +213,25 @@ fun ForgotPasswordScreen(
                 }
             }
         }
+
+        if (authViewModel.isLoading) {
+            LoadingState()
+        }
+
+        authViewModel.errorMessage?.let {
+            ErrorState(message = it)
+        }
     }
 }
 
 // ─── Request Reset Content ────────────────────────────────────────────────────
 
 @Composable
-private fun ForgotRequestContent(onSend: () -> Unit) {
+private fun ForgotRequestContent(
+    authViewModel: AuthViewModel = viewModel {
+        AuthViewModel(AuthRepositoryImpl(SupabaseModule.client))
+    }
+) {
     var email by remember { mutableStateOf(TextFieldValue("")) }
 
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -241,7 +267,11 @@ private fun ForgotRequestContent(onSend: () -> Unit) {
                 .height(50.dp)
                 .clip(RoundedCornerShape(50))
                 .background(ButtonGradient)
-                .clickable { onSend() },
+                .clickable {
+                    if (email.text.isNotEmpty()) {
+                        authViewModel.sendPasswordResetEmail(email.text)
+                    }
+                },
             contentAlignment = Alignment.Center
         ) {
             Text(

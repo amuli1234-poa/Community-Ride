@@ -11,5 +11,6 @@ object SupabaseModule {
     val client = createSupabaseClient(SUPABASE_URL, SUPABASE_ANON_KEY) {
         install(Postgrest)
         install(Realtime)
+        install(io.github.jan.supabase.auth.Auth)
     }
 }

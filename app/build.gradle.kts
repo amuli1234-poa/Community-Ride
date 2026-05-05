@@ -62,7 +62,7 @@ dependencies {
     implementation(libs.ktor.client.android)
 
     implementation(libs.coil.compose)
-
+    implementation(libs.androidx.compose.foundation)
 
 
 //    testImplementation(libs.junit)

@@ -12,8 +12,9 @@ data class RiderProfile(
     val rides_taken: Int = 0,
     val community_rating: Double = 0.0,
     val total_reviews: Int = 0,
-    val member_since: String? = null,
+    val member_since: String? = null, // Assuming ISO 8601 string from Supabase
     val phone_verified: Boolean = false,
     val email_verified: Boolean = false,
+    val phone_number: String? = null,
     val bio: String? = null
 )
