@@ -14,10 +14,16 @@ class ProfileRepositoryImpl(
 ) : ProfileRepository {
     override suspend fun getProfile(userId: String): RiderProfile? {
         return try {
-            supabaseClient.from("profiles").select {
+            val response = supabaseClient.from("profiles").select {
                 filter { eq("id", userId) }
-            }.decodeSingle<RiderProfile>()
+            }
+            if (response.data == "null" || response.data == "[]") {
+                null
+            } else {
+                response.decodeSingle<RiderProfile>()
+            }
         } catch (e: Exception) {
+            println("DEBUG: ProfileRepository Error: ${e.message}")
             null
         }
     }

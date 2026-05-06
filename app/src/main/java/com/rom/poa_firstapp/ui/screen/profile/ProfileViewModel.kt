@@ -55,4 +55,15 @@ class ProfileViewModel(
             isLoading = false
         }
     }
+
+    fun logout(onSuccess: () -> Unit) {
+        viewModelScope.launch {
+            try {
+                supabaseClient.auth.signOut()
+                onSuccess()
+            } catch (e: Exception) {
+                errorMessage = e.localizedMessage ?: "Logout failed"
+            }
+        }
+    }
 }

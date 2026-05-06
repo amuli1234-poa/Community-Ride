@@ -74,8 +74,7 @@ class MessageRepositoryImpl(
         val channel = supabaseClient.realtime.channel("messages_$userId")
         return channel.postgresChangeFlow<PostgresAction>(schema = "public") {
             table = "messages"
-            // Filter might not be fully supported in all client versions for realtime yet, 
-            // but we'll try to listen to the table and filter in the ViewModel if needed.
+
         }
     }
 }

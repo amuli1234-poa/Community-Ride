@@ -27,6 +27,21 @@
         .custom-marker-icon.red { border-color: #F44336; background-color: #F44336; }
         .custom-marker-icon.yellow { border-color: #FFC107; background-color: #FFC107; }
         .custom-marker-icon.blue-dot { border-color: #2196F3; background-color: #2196F3; width: 16px; height: 16px; }
+
+        /* Style for the permanent label */
+        .ride-tooltip {
+            background-color: white;
+            border: 1px solid #4CAF50;
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 11px;
+            font-weight: bold;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            white-space: nowrap;
+        }
+        .leaflet-tooltip-top:before {
+            border-top-color: #4CAF50;
+        }
     </style>
 </head>
 <body>
@@ -44,21 +59,74 @@
 
     var rideMarkers = {};
 
-    function addOrUpdateRideMarker(id, lat, lng, name, seats, phone, status) {
-        var icon = icons[status] || icons.green;
+    function addOrUpdateRideMarker(id, riderId, name, seats, phone, lat, lng, status, destination, pickup, departureTime, departureDate) {
+        var iconColor = "green";
+        if (status === "Paid") iconColor = "red";
+        if (status === "Pending") iconColor = "yellow";
+
+        var icon = icons[iconColor] || icons.green;
+
+        var labelContent = "<strong>" + name + "</strong><br>" +
+                           "From: " + (pickup || "N/A") + "<br>" +
+                           "To: " + (destination || "N/A") + "<br>" +
+                           "Date: " + (departureDate || "N/A") + "<br>" +
+                           "Time: " + (departureTime || "N/A") + "<br>" +
+                           "Seats: " + seats;
+
         if (rideMarkers[id]) {
             rideMarkers[id].setLatLng([lat, lng]);
+            rideMarkers[id].setIcon(icon);
+            rideMarkers[id].setTooltipContent(labelContent);
+            rideMarkers[id].departureTime = departureTime;
+            rideMarkers[id].departureDate = departureDate;
         } else {
             var marker = L.marker([lat, lng], {icon: icon}).addTo(mymap);
+            marker.departureTime = departureTime;
+            marker.departureDate = departureDate;
+
+            // Add a permanent tooltip (label) on top of the marker
+            marker.bindTooltip(labelContent, {
+                permanent: true,
+                direction: 'top',
+                offset: [0, -32],
+                className: 'ride-tooltip'
+            });
+
             marker.on('click', function() {
-                // Call Kotlin interface to navigate to profile
                 if (window.Android) {
-                    window.Android.onMarkerClick(id, name, seats, phone, lat, lng, status);
+                    window.Android.onMarkerClick(id, riderId, name, seats, phone, lat, lng, status);
                 }
             });
             rideMarkers[id] = marker;
         }
     }
+
+    function removeRideMarker(id) {
+        if (rideMarkers[id]) {
+            mymap.removeLayer(rideMarkers[id]);
+            delete rideMarkers[id];
+        }
+    }
+
+    function checkExpiredRides() {
+        var now = new Date();
+
+        for (var id in rideMarkers) {
+            var depTime = rideMarkers[id].departureTime;
+            var depDate = rideMarkers[id].departureDate;
+
+            if (depTime && depTime !== "N/A" && depTime !== "" && depDate && depDate !== "N/A" && depDate !== "") {
+                // Expected format: depDate "YYYY-MM-DD", depTime "HH:MM"
+                var rideDateTime = new Date(depDate + "T" + depTime + ":00");
+
+                if (now > rideDateTime) {
+                    console.log("Removing expired ride: " + id + " scheduled for " + rideDateTime);
+                    removeRideMarker(id);
+                }
+            }
+        }
+    }
+    setInterval(checkExpiredRides, 30000); // Check every 30 seconds
 
     // Geolocation
     mymap.on("locationfound", function(e) {

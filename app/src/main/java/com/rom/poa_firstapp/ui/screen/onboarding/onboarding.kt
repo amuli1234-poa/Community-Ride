@@ -118,8 +118,11 @@ fun OnboardingScreen(
         AuthViewModel(AuthRepositoryImpl(SupabaseModule.client))
     }
 ) {
+    println("DEBUG: OnboardingScreen composing")
     LaunchedEffect(Unit) {
+        println("DEBUG: OnboardingScreen LaunchedEffect")
         if (authViewModel.isUserLoggedIn()) {
+            println("DEBUG: User is logged in, navigating to Home from Onboarding")
             navController.navigate(ROUTES.Home.name) {
                 popUpTo(ROUTES.Onboarding.name) { inclusive = true }
             }
@@ -137,6 +140,7 @@ fun OnboardingScreen(
         if (currentPage < pages.lastIndex) {
             scope.launch { pagerState.animateScrollToPage(currentPage + 1) }
         } else {
+            println("DEBUG: Onboarding finished, navigating to Login")
             navController.navigate(ROUTES.Login.name) {
                 popUpTo(ROUTES.Onboarding.name) { inclusive = true }
             }

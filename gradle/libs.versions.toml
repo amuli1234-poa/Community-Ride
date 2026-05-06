@@ -17,8 +17,11 @@ navigationCompose = "2.9.7"
 supabase = "3.6.0"
 ktor = "3.0.1"
 foundation = "1.11.0"
+kotlinxSerializationJson = "1.7.3"
+playServicesLocation = "21.3.0"
 
 [libraries]
+play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-core-splashscreen = { module = "androidx.core:core-splashscreen", version.ref = "coreSplashscreen" }
 androidx-navigation-compose = { module = "androidx.navigation:navigation-compose", version.ref = "navigationCompose" }
@@ -47,7 +50,9 @@ supabase-realtime = { module = "io.github.jan-tennert.supabase:realtime-kt" }
 supabase-auth = { module = "io.github.jan-tennert.supabase:auth-kt" }
 ktor-client-android = { module = "io.ktor:ktor-client-android", version.ref = "ktor" }
 androidx-compose-foundation = { group = "androidx.compose.foundation", name = "foundation", version.ref = "foundation" }
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }

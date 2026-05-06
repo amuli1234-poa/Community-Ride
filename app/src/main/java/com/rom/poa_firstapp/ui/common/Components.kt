@@ -1,5 +1,6 @@
 package com.rom.poa_firstapp.ui.common
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -13,10 +14,15 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun LoadingState(modifier: Modifier = Modifier) {
     Box(
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier.fillMaxSize().background(Color.White),
         contentAlignment = Alignment.Center
     ) {
-        CircularProgressIndicator(color = Color(0xFF4CAF50))
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            CircularProgressIndicator(color = Color(0xFF4CAF50))
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(text = "Loading...", color = Color(0xFF4CAF50))
+
+        }
     }
 }
 

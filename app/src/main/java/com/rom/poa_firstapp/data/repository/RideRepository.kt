@@ -13,7 +13,7 @@ import kotlinx.coroutines.flow.Flow
 interface RideRepository {
     fun getRidesFlow(): Flow<PostgresAction>
     suspend fun getAllRides(): List<Ride>
-    suspend fun postRide(ride: Ride): Boolean
+    suspend fun postRide(ride: Ride): Result<Unit>
 }
 
 class RideRepositoryImpl(
@@ -31,12 +31,15 @@ class RideRepositoryImpl(
         return supabaseClient.from("rides").select().decodeList<Ride>()
     }
 
-    override suspend fun postRide(ride: Ride): Boolean {
+    override suspend fun postRide(ride: Ride): Result<Unit> {
         return try {
+            println("DEBUG: Posting ride to Supabase: $ride")
             supabaseClient.from("rides").insert(ride)
-            true
+            Result.success(Unit)
         } catch (e: Exception) {
-            false
+            println("DEBUG: Supabase Insert Error: ${e.message}")
+            e.printStackTrace()
+            Result.failure(e)
         }
     }
 }

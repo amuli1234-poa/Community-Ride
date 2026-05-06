@@ -33,8 +33,6 @@ import com.rom.poa_firstapp.data.repository.MessageRepositoryImpl
 import com.rom.poa_firstapp.ui.common.LoadingState
 import com.rom.poa_firstapp.ui.common.ErrorState
 import java.text.SimpleDateFormat
-import java.time.ZonedDateTime
-import java.time.format.DateTimeFormatter
 import java.util.*
 
 @Composable
@@ -179,7 +177,7 @@ fun MessageItem(
                 Text(text = lastMessage, color = Color.Gray, fontSize = 14.sp, maxLines = 1)
             }
             Column(horizontalAlignment = Alignment.End) {
-//                Text(text = formatTimestamp(timestamp), fontSize = 12.sp, color = Color.Gray)
+                Text(text = formatTimestamp(timestamp), fontSize = 12.sp, color = Color.Gray)
                 if (unreadCount > 0) {
                     Spacer(modifier = Modifier.height(4.dp))
                     Badge(
@@ -194,11 +192,13 @@ fun MessageItem(
     }
 }
 
-//fun formatTimestamp(timestamp: String): String {
-//    return try {
-//        val zdt = ZonedDateTime.parse(timestamp)
-//        zdt.format(DateTimeFormatter.ofPattern("HH:mm"))
-//    } catch (e: Exception) {
-//        if (timestamp.length >= 10) timestamp.substring(5, 10) else timestamp
-//    }
-//}
+fun formatTimestamp(timestamp: String): String {
+    return try {
+        val inputFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
+        val date = inputFormat.parse(timestamp)
+        val outputFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
+        date?.let { outputFormat.format(it) } ?: timestamp.substring(11, 16)
+    } catch (e: Exception) {
+        if (timestamp.length >= 16) timestamp.substring(11, 16) else timestamp
+    }
+}
