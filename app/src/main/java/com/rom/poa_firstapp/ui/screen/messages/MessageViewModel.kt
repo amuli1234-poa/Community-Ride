@@ -8,8 +8,8 @@ import androidx.lifecycle.viewModelScope
 import com.rom.poa_firstapp.data.model.Conversation
 import com.rom.poa_firstapp.data.model.Message
 import com.rom.poa_firstapp.data.repository.MessageRepository
-import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.SupabaseClient
+import io.github.jan.supabase.auth.auth
 import kotlinx.coroutines.launch
 
 class MessageViewModel(
@@ -31,6 +31,17 @@ class MessageViewModel(
 
     init {
         loadConversations()
+        observeMessages()
+    }
+
+    private fun observeMessages() {
+        val userId = supabaseClient.auth.currentUserOrNull()?.id ?: return
+        viewModelScope.launch {
+            repository.getMessagesFlow(userId).collect {
+                // Any realtime insert/update/delete → refresh conversation list
+                loadConversations()
+            }
+        }
     }
 
     fun loadConversations() {
@@ -64,14 +75,13 @@ class MessageViewModel(
     fun sendMessage(recipientId: String, content: String) {
         val userId = supabaseClient.auth.currentUserOrNull()?.id ?: return
         val message = Message(
-            sender_id = userId,
+            sender_id    = userId,
             recipient_id = recipientId,
-            content = content
+            content      = content
         )
         viewModelScope.launch {
             try {
                 repository.sendMessage(message)
-                // Optionally reload messages or wait for realtime update
                 loadMessages(recipientId)
             } catch (e: Exception) {
                 errorMessage = e.localizedMessage

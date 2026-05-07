@@ -10,4 +10,8 @@ enum class ROUTES {
     Profile,
     ProfileSetup,
     Messages,
+    RideDetails,
+    FindRide,
+    MyRides,
+    Notifications,
 }

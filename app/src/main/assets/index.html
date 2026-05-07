@@ -22,11 +22,18 @@
             font-size: 18px;
             color: white;
             box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            overflow: hidden;
         }
         .custom-marker-icon.green { border-color: #4CAF50; background-color: #4CAF50; }
         .custom-marker-icon.red { border-color: #F44336; background-color: #F44336; }
         .custom-marker-icon.yellow { border-color: #FFC107; background-color: #FFC107; }
         .custom-marker-icon.blue-dot { border-color: #2196F3; background-color: #2196F3; width: 16px; height: 16px; }
+
+        .marker-avatar {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
 
         /* Style for the permanent label */
         .ride-tooltip {
@@ -51,20 +58,30 @@
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(mymap);
 
     var icons = {
-        green: L.divIcon({ className: "custom-marker-icon green", html: '<i class="fa-solid fa-car"></i>', iconSize: [36, 36], iconAnchor: [18, 36] }),
-        red: L.divIcon({ className: "custom-marker-icon red", html: '<i class="fa-solid fa-car"></i>', iconSize: [36, 36], iconAnchor: [18, 36] }),
-        yellow: L.divIcon({ className: "custom-marker-icon yellow", html: '<i class="fa-solid fa-clock"></i>', iconSize: [36, 36], iconAnchor: [18, 36] }),
+        green: '<i class="fa-solid fa-car"></i>',
+        red: '<i class="fa-solid fa-car"></i>',
+        yellow: '<i class="fa-solid fa-clock"></i>',
         blue: L.divIcon({ className: "custom-marker-icon blue-dot", iconSize: [16, 16], iconAnchor: [8, 8] })
     };
 
     var rideMarkers = {};
 
-    function addOrUpdateRideMarker(id, riderId, name, seats, phone, lat, lng, status, destination, pickup, departureTime, departureDate) {
+    function addOrUpdateRideMarker(id, riderId, name, seats, phone, lat, lng, status, destination, pickup, departureTime, departureDate, avatarUrl) {
         var iconColor = "green";
         if (status === "Paid") iconColor = "red";
         if (status === "Pending") iconColor = "yellow";
 
-        var icon = icons[iconColor] || icons.green;
+        var htmlContent = icons[iconColor];
+        if (avatarUrl && avatarUrl !== "") {
+            htmlContent = '<img src="' + avatarUrl + '" class="marker-avatar" />';
+        }
+
+        var icon = L.divIcon({
+            className: "custom-marker-icon " + iconColor,
+            html: htmlContent,
+            iconSize: [36, 36],
+            iconAnchor: [18, 36]
+        });
 
         var labelContent = "<strong>" + name + "</strong><br>" +
                            "From: " + (pickup || "N/A") + "<br>" +
@@ -116,9 +133,7 @@
             var depDate = rideMarkers[id].departureDate;
 
             if (depTime && depTime !== "N/A" && depTime !== "" && depDate && depDate !== "N/A" && depDate !== "") {
-                // Expected format: depDate "YYYY-MM-DD", depTime "HH:MM"
                 var rideDateTime = new Date(depDate + "T" + depTime + ":00");
-
                 if (now > rideDateTime) {
                     console.log("Removing expired ride: " + id + " scheduled for " + rideDateTime);
                     removeRideMarker(id);

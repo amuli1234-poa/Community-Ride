@@ -15,6 +15,10 @@ import com.rom.poa_firstapp.ui.screen.postRide.PostRideScreen
 import com.rom.poa_firstapp.ui.screen.profile.RiderProfileScreen
 import com.rom.poa_firstapp.ui.screen.profile.ProfileSetupScreen
 import com.rom.poa_firstapp.ui.screen.messages.MessagesScreen
+import com.rom.poa_firstapp.ui.screen.rideDetails.RideDetailsScreen
+import com.rom.poa_firstapp.ui.screen.findRide.FindRideScreen
+import com.rom.poa_firstapp.ui.screen.myRides.MyRidesScreen
+import com.rom.poa_firstapp.ui.screen.notifications.NotificationsScreen
 import io.github.jan.supabase.auth.auth
 
 @Composable
@@ -34,9 +38,12 @@ fun AppNavigation(
         composable(ROUTES.Signup.name){SignupScreen(navController, modifier)}
         composable(ROUTES.ForgotPassword.name){ForgotPasswordScreen(navController, modifier)}
         composable(ROUTES.Home.name){HomeScreen(navController, modifier)}
-        composable(ROUTES.PostRide.name){PostRideScreen(navController)}
-        composable(ROUTES.Profile.name) {
-            val profileId = navController.currentBackStackEntry?.savedStateHandle?.get<String>("profileId")
+        composable(ROUTES.PostRide.name + "?rideId={rideId}") { backStackEntry ->
+            val rideId = backStackEntry.arguments?.getString("rideId")
+            PostRideScreen(navController, rideId)
+        }
+        composable(ROUTES.Profile.name + "?profileId={profileId}") { backStackEntry ->
+            val profileId = backStackEntry.arguments?.getString("profileId")
             RiderProfileScreen(
                 profileId = profileId,
                 onBack = { navController.popBackStack() },
@@ -49,6 +56,19 @@ fun AppNavigation(
         }
         composable(ROUTES.Messages.name) {
             MessagesScreen(onBack = { navController.popBackStack() })
+        }
+        composable("${ROUTES.RideDetails.name}/{rideId}") { backStackEntry ->
+            val rideId = backStackEntry.arguments?.getString("rideId") ?: ""
+            RideDetailsScreen(navController, rideId)
+        }
+        composable(ROUTES.FindRide.name) {
+            FindRideScreen(navController)
+        }
+        composable(ROUTES.MyRides.name) {
+            MyRidesScreen(navController)
+        }
+        composable(ROUTES.Notifications.name) {
+            NotificationsScreen(navController)
         }
         composable(ROUTES.ProfileSetup.name) {
             val userId = SupabaseModule.client.auth.currentSessionOrNull()?.user?.id

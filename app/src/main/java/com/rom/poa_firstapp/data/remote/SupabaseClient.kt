@@ -3,6 +3,7 @@ package com.rom.poa_firstapp.data.remote
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.realtime.Realtime
+import io.github.jan.supabase.storage.Storage
 
 object SupabaseModule {
     private const val SUPABASE_URL = "https://tthltglhujmekpbfebxd.supabase.co"
@@ -12,5 +13,6 @@ object SupabaseModule {
         install(Postgrest)
         install(Realtime)
         install(io.github.jan.supabase.auth.Auth)
+        install(Storage)
     }
 }

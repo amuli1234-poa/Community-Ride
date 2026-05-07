@@ -17,6 +17,7 @@ data class Conversation(
     val id: String,
     val other_user_id: String,
     val other_user_name: String,
+    val other_user_avatar_url: String? = null,
     val other_user_phone: String,
     val last_message: String,
     val last_message_time: String,

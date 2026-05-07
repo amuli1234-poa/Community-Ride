@@ -14,13 +14,13 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun LoadingState(modifier: Modifier = Modifier) {
     Box(
-        modifier = modifier.fillMaxSize().background(Color.White),
+        modifier = modifier.fillMaxSize().background(Color(0xFF080C1C)),
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            CircularProgressIndicator(color = Color(0xFF4CAF50))
+            CircularProgressIndicator(color = Color(0xFF00E5FF))
             Spacer(modifier = Modifier.height(16.dp))
-            Text(text = "Loading...", color = Color(0xFF4CAF50))
+            Text(text = "Loading...", color = Color(0xFF00E5FF))
 
         }
     }

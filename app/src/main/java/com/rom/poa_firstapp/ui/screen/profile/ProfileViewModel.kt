@@ -29,16 +29,21 @@ class ProfileViewModel(
         viewModelScope.launch {
             isLoading = true
             errorMessage = null
-            val id = userId ?: supabaseClient.auth.currentUserOrNull()?.id
-            if (id != null) {
-                profile = profileRepository.getProfile(id)
-                if (profile == null) {
-                    errorMessage = "Failed to load profile"
+            try {
+                val id = userId ?: supabaseClient.auth.currentUserOrNull()?.id
+                if (id != null) {
+                    profile = profileRepository.getProfile(id)
+                    if (profile == null) {
+                        errorMessage = "Failed to load profile"
+                    }
+                } else {
+                    errorMessage = "User not logged in"
                 }
-            } else {
-                errorMessage = "User not logged in"
+            } catch (e: Exception) {
+                errorMessage = e.localizedMessage ?: "An error occurred"
+            } finally {
+                isLoading = false
             }
-            isLoading = false
         }
     }
 
@@ -52,6 +57,31 @@ class ProfileViewModel(
             }.onFailure {
                 errorMessage = it.localizedMessage ?: "Failed to update profile"
             }
+            isLoading = false
+        }
+    }
+
+    fun uploadAvatar(userId: String, byteArray: ByteArray) {
+        viewModelScope.launch {
+            isLoading = true
+            errorMessage = null
+            
+            val uploadResult = profileRepository.uploadAvatar(userId, byteArray)
+            uploadResult.onSuccess { publicUrl ->
+                val currentProfile = profile
+                if (currentProfile != null) {
+                    val updatedProfile = currentProfile.copy(avatar_url = publicUrl)
+                    val updateResult = profileRepository.updateProfile(updatedProfile)
+                    updateResult.onSuccess {
+                        profile = updatedProfile
+                    }.onFailure {
+                        errorMessage = it.localizedMessage ?: "Failed to update profile metadata"
+                    }
+                }
+            }.onFailure {
+                errorMessage = it.localizedMessage ?: "Failed to upload avatar"
+            }
+
             isLoading = false
         }
     }

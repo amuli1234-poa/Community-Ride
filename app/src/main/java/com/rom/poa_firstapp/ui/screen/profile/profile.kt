@@ -4,9 +4,13 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -93,7 +97,7 @@ fun RiderProfileScreen(
     Scaffold(
         topBar = {
             ProfileTopAppBar(
-                onBack       = onBack,
+                onBack       = { onBack() },
                 isOwnProfile = isOwnProfile,
                 onEditClick  = { isEditing = !isEditing },
                 onLogoutClick = {
@@ -123,7 +127,10 @@ fun RiderProfileScreen(
                     ProfileHero(
                         profile         = currentProfile,
                         isEditing       = isEditing,
-                        onProfileUpdate = { viewModel.updateProfile(it) }
+                        onProfileUpdate = { viewModel.updateProfile(it) },
+                        onAvatarUpload  = { bytes ->
+                            viewModel.uploadAvatar(currentProfile.id, bytes)
+                        }
                     )
                     // Body sections
                     Column(
@@ -217,8 +224,10 @@ fun ProfileTopAppBar(
 fun ProfileHero(
     profile: RiderProfile,
     isEditing: Boolean,
-    onProfileUpdate: (RiderProfile) -> Unit
+    onProfileUpdate: (RiderProfile) -> Unit,
+    onAvatarUpload: (ByteArray) -> Unit
 ) {
+    val context     = LocalContext.current
     var fullName    by remember(profile.full_name)   { mutableStateOf(profile.full_name) }
     var bio         by remember(profile.bio)         { mutableStateOf(profile.bio ?: "") }
     var phoneNumber by remember(profile.phone_number){ mutableStateOf(profile.phone_number ?: "") }
@@ -264,16 +273,45 @@ fun ProfileHero(
                     error    = painterResource(R.drawable.ic_profile),
                     fallback = painterResource(R.drawable.ic_profile)
                 )
-                Image(
-                    painter            = painter,
-                    contentDescription = "Profile Picture",
-                    contentScale       = ContentScale.Crop,
-                    modifier           = Modifier
+                val launcher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.PickVisualMedia()
+                ) { uri ->
+                    uri?.let {
+                        context.contentResolver.openInputStream(it)?.use { inputStream ->
+                            val bytes = inputStream.readBytes()
+                            onAvatarUpload(bytes)
+                        }
+                    }
+                }
+
+                Box(
+                    modifier = Modifier
                         .size(76.dp)
-                        .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.15f))
-                        .border(2.5.dp, Color.White.copy(alpha = 0.35f), CircleShape)
-                )
+                        .clickable(enabled = isEditing) {
+                            launcher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                        }
+                ) {
+                    Image(
+                        painter            = painter,
+                        contentDescription = "Profile Picture",
+                        contentScale       = ContentScale.Crop,
+                        modifier           = Modifier
+                            .fillMaxSize()
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha = 0.15f))
+                            .border(2.5.dp, Color.White.copy(alpha = 0.35f), CircleShape)
+                    )
+                    if (isEditing) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.Black.copy(alpha = 0.3f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.CameraAlt, contentDescription = "Change Photo", tint = Color.White, modifier = Modifier.size(20.dp))
+                        }
+                    }
+                }
 
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     if (isEditing) {
@@ -337,8 +375,15 @@ fun ProfileHero(
                 Spacer(modifier = Modifier.height(10.dp))
                 Button(
                     onClick = {
+                        val cleaned = phoneNumber.filter { it.isDigit() }
+                        val formatted = when {
+                            cleaned.startsWith("254") -> cleaned
+                            cleaned.startsWith("0") -> "254" + cleaned.substring(1)
+                            cleaned.length == 9 -> "254$cleaned"
+                            else -> cleaned
+                        }
                         onProfileUpdate(
-                            profile.copy(full_name = fullName, bio = bio, phone_number = phoneNumber)
+                            profile.copy(full_name = fullName, bio = bio, phone_number = formatted)
                         )
                     },
                     modifier = Modifier.align(Alignment.End),
@@ -666,14 +711,16 @@ fun MessageRiderButton(riderName: String, phoneNumber: String, context: Context)
     ) {
         Button(
             onClick = {
-                val msg  = "Hi $riderName, I saw your ride on Community Ride app..."
-                val uri  = Uri.parse("https://api.whatsapp.com/send?phone=$phoneNumber&text=$msg")
-                val intent = Intent(Intent.ACTION_VIEW, uri)
-                if (intent.resolveActivity(context.packageManager) != null) {
-                    context.startActivity(intent)
-                } else {
-                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://web.whatsapp.com/send?phone=$phoneNumber&text=$msg")))
+                val rawPhone = phoneNumber.filter { it.isDigit() }
+                val formattedPhone = when {
+                    rawPhone.startsWith("254") -> rawPhone
+                    rawPhone.startsWith("0") -> "254" + rawPhone.substring(1)
+                    else -> if (rawPhone.length == 9) "254$rawPhone" else rawPhone
                 }
+                val msg  = "Hi $riderName, I saw your profile on Community Ride app..."
+                val uri  = Uri.parse("https://api.whatsapp.com/send?phone=$formattedPhone&text=$msg")
+                val intent = Intent(Intent.ACTION_VIEW, uri)
+                context.startActivity(intent)
             },
             modifier = Modifier
                 .fillMaxWidth()

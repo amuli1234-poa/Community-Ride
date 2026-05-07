@@ -7,6 +7,7 @@ data class Ride(
     val id: String,
     val rider_id: String,
     val rider_name: String,
+    val rider_avatar_url: String? = null,
     val seats_left: Int,
     val rider_phone: String,
     val start_lat: Double,
