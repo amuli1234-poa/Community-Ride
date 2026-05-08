@@ -6,14 +6,17 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.rom.poa_firstapp.data.model.BookingWithProfile
 import com.rom.poa_firstapp.data.model.Ride
 import com.rom.poa_firstapp.data.repository.NotificationRepository
+import com.rom.poa_firstapp.data.repository.ProfileRepository
 import com.rom.poa_firstapp.data.repository.RideRepository
 import kotlinx.coroutines.launch
 
 class MyRidesViewModel(
     private val rideRepository: RideRepository,
     private val notificationRepository: NotificationRepository,
+    private val profileRepository: ProfileRepository,
     private val userId: String?
 ) : ViewModel() {
 
@@ -32,9 +35,29 @@ class MyRidesViewModel(
     var unreadCount by mutableIntStateOf(0)
         private set
 
+    var rideBookings by mutableStateOf<Map<String, List<BookingWithProfile>>>(emptyMap())
+        private set
+
+    var userType by mutableStateOf("passenger")
+        private set
+
     init {
+        loadUserProfile()
         refreshRides()
         loadUnreadCount()
+    }
+
+    private fun loadUserProfile() {
+        userId?.let {
+            viewModelScope.launch {
+                val profile = profileRepository.getProfile(it)
+                profile?.let { p ->
+                    userType = p.user_type
+                    // Set default tab based on user type
+                    selectedTab = if (p.user_type == "driver") 0 else 1
+                }
+            }
+        }
     }
 
     fun onTabChange(index: Int) {
@@ -47,8 +70,21 @@ class MyRidesViewModel(
                 isLoading = true
                 driverRides = rideRepository.getUserRides(it)
                 passengerRides = rideRepository.getUserBookedRides(it)
+                
+                // Fetch bookings for all driver rides
+                driverRides.forEach { ride ->
+                    loadBookingsForRide(ride.id)
+                }
+                
                 isLoading = false
             }
+        }
+    }
+
+    private fun loadBookingsForRide(rideId: String) {
+        viewModelScope.launch {
+            val bookings = rideRepository.getRideBookings(rideId)
+            rideBookings = rideBookings + (rideId to bookings)
         }
     }
 
@@ -75,6 +111,29 @@ class MyRidesViewModel(
                 refreshRides()
             }
             result
+        } else {
+            Result.failure(Exception("User not logged in"))
+        }
+    }
+
+    suspend fun completeRide(rideId: String): Result<Unit> {
+        val result = rideRepository.updateRideStatus(rideId, "completed")
+        if (result.isSuccess) {
+            refreshRides()
+        }
+        return result
+    }
+
+    suspend fun submitRating(rideId: String, ratedId: String, rating: Int, comment: String): Result<Unit> {
+        return if (userId != null) {
+            val ratingObj = com.rom.poa_firstapp.data.model.Rating(
+                ride_id = rideId,
+                rater_id = userId,
+                rated_id = ratedId,
+                rating = rating,
+                comment = comment.takeIf { it.isNotBlank() }
+            )
+            rideRepository.submitRating(ratingObj)
         } else {
             Result.failure(Exception("User not logged in"))
         }

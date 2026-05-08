@@ -11,7 +11,7 @@ import io.github.jan.supabase.realtime.channel
 import io.github.jan.supabase.realtime.postgresChangeFlow
 import io.github.jan.supabase.realtime.realtime
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onStart
 
 interface MessageRepository {
@@ -139,7 +139,7 @@ class MessageRepositoryImpl(
     }
 
     override fun getMessagesFlow(userId: String): Flow<PostgresAction> {
-        val channel = supabaseClient.realtime.channel("messages_$userId")
+        val channel = supabaseClient.realtime.channel("messages_${userId}_${java.util.UUID.randomUUID()}")
         val flow = channel.postgresChangeFlow<PostgresAction>(schema = "public") {
             table = "messages"
         }
@@ -150,6 +150,8 @@ class MessageRepositoryImpl(
             } catch (e: Exception) {
                 println("DEBUG: Message realtime subscription error: ${e.message}")
             }
+        }.onCompletion {
+            channel.unsubscribe()
         }
     }
 }

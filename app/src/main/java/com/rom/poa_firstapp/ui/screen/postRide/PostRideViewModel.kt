@@ -113,6 +113,11 @@ class PostRideViewModel(
                         return@launch
                     }
 
+                if (profile.user_type.lowercase() != "driver") {
+                    errorMessage = "Only drivers can post rides. Please update your profile type."
+                    return@launch
+                }
+
                 val pickupCoords = withContext(Dispatchers.IO) {
                     try {
                         geocoder.getFromLocationName(pickupLocation, 1)?.firstOrNull()

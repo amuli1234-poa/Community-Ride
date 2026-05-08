@@ -1,5 +1,7 @@
 package com.rom.poa_firstapp.ui.screen.myRides
 
+import android.content.Intent
+import android.net.Uri
 import android.widget.Toast
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
@@ -35,12 +37,16 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import androidx.navigation.NavController
+import com.rom.poa_firstapp.data.model.Rating
 import coil3.compose.AsyncImage
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.rom.poa_firstapp.data.model.BookingWithProfile
 import com.rom.poa_firstapp.data.model.Ride
 import com.rom.poa_firstapp.data.remote.SupabaseModule
 import com.rom.poa_firstapp.data.repository.NotificationRepositoryImpl
+import com.rom.poa_firstapp.data.repository.ProfileRepositoryImpl
 import com.rom.poa_firstapp.data.repository.RideRepositoryImpl
 import com.rom.poa_firstapp.ui.navigation.ROUTES
 import io.github.jan.supabase.auth.auth
@@ -51,12 +57,13 @@ import androidx.lifecycle.ViewModelProvider
 class MyRidesViewModelFactory(
     private val rideRepository: com.rom.poa_firstapp.data.repository.RideRepository,
     private val notificationRepository: com.rom.poa_firstapp.data.repository.NotificationRepository,
+    private val profileRepository: com.rom.poa_firstapp.data.repository.ProfileRepository,
     private val userId: String?
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(MyRidesViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return MyRidesViewModel(rideRepository, notificationRepository, userId) as T
+            return MyRidesViewModel(rideRepository, notificationRepository, profileRepository, userId) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }
@@ -117,6 +124,7 @@ fun MyRidesScreen(navController: NavController) {
         factory = MyRidesViewModelFactory(
             RideRepositoryImpl(SupabaseModule.client),
             NotificationRepositoryImpl(SupabaseModule.client),
+            ProfileRepositoryImpl(SupabaseModule.client),
             userId
         )
     )
@@ -126,12 +134,15 @@ fun MyRidesScreen(navController: NavController) {
     val unreadCount = viewModel.unreadCount
     val driverRides = viewModel.driverRides
     val passengerRides = viewModel.passengerRides
+    val rideBookings = viewModel.rideBookings
 
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
     var showDeleteDialog by remember { mutableStateOf<String?>(null) }
     var showCancelBookingDialog by remember { mutableStateOf<String?>(null) }
+    var showCompleteRideDialog by remember { mutableStateOf<String?>(null) }
+    var showRatingDialog by remember { mutableStateOf<Triple<String, String, String>?>(null) } // rideId, ratedUserId, ratedUserName
 
     Box(
         modifier = Modifier
@@ -162,10 +173,34 @@ fun MyRidesScreen(navController: NavController) {
                             MyRideCard(
                                 ride = ride,
                                 isDriver = selectedTab == 0,
+                                bookings = rideBookings[ride.id] ?: emptyList(),
                                 onClick = { navController.navigate("${ROUTES.RideDetails.name}/${ride.id}") },
                                 onEdit = { navController.navigate("${ROUTES.PostRide.name}?rideId=${ride.id}") },
                                 onDelete = { showDeleteDialog = ride.id },
-                                onCancel = { showCancelBookingDialog = ride.id }
+                                onCancel = { showCancelBookingDialog = ride.id },
+                                onComplete = { showCompleteRideDialog = ride.id },
+                                onRateDriver = { showRatingDialog = Triple(ride.id, ride.rider_id, ride.rider_name) },
+                                onRatePassenger = { passenger ->
+                                    showRatingDialog = Triple(ride.id, passenger.user_id, passenger.full_name)
+                                },
+                                onWhatsAppPassenger = { passenger ->
+                                    val rawPhone = passenger.phone_number?.filter { it.isDigit() } ?: ""
+                                    val phone = when {
+                                        rawPhone.startsWith("254") -> rawPhone
+                                        rawPhone.startsWith("0")   -> "254" + rawPhone.substring(1)
+                                        rawPhone.length == 9       -> "254$rawPhone"
+                                        else                       -> rawPhone
+                                    }
+                                    val text = "Hello ${passenger.full_name}, I'm the driver for your ride to ${ride.destination}."
+                                    try {
+                                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://api.whatsapp.com/send?phone=$phone&text=${Uri.encode(text)}")))
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "Could not open WhatsApp", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                onProfilePassenger = { passenger ->
+                                    navController.navigate("${ROUTES.Profile.name}?profileId=${passenger.user_id}")
+                                }
                             )
                         }
                     }
@@ -205,6 +240,37 @@ fun MyRidesScreen(navController: NavController) {
                     }
                 },
                 onDismiss = { showCancelBookingDialog = null }
+            )
+        }
+
+        showCompleteRideDialog?.let { id ->
+            NightAlertDialog(
+                title = "Complete Ride",
+                body = "Mark this ride as completed? This will archive the ride.",
+                confirmText = "Complete",
+                confirmColor = MintPrimary,
+                onConfirm = {
+                    showCompleteRideDialog = null
+                    scope.launch {
+                        val result = viewModel.completeRide(id)
+                        Toast.makeText(context, if (result.isSuccess) "Ride completed" else "Failed to complete ride", Toast.LENGTH_SHORT).show()
+                    }
+                },
+                onDismiss = { showCompleteRideDialog = null }
+            )
+        }
+
+        showRatingDialog?.let { (rideId, ratedId, ratedName) ->
+            RatingDialog(
+                targetName = ratedName,
+                onDismiss = { showRatingDialog = null },
+                onSubmit = { rating, comment ->
+                    scope.launch {
+                        val result = viewModel.submitRating(rideId, ratedId, rating, comment)
+                        Toast.makeText(context, if (result.isSuccess) "Rating submitted for $ratedName" else "Failed to submit rating", Toast.LENGTH_SHORT).show()
+                        showRatingDialog = null
+                    }
+                }
             )
         }
     }
@@ -339,29 +405,29 @@ fun PillTabRow(selectedTab: Int, onTabChange: (Int) -> Unit) {
 fun MyRideCard(
     ride: Ride,
     isDriver: Boolean,
+    bookings: List<BookingWithProfile> = emptyList(),
     onClick: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onCancel: () -> Unit,
+    onComplete: () -> Unit,
+    onRateDriver: () -> Unit = {},
+    onRatePassenger: (BookingWithProfile) -> Unit = {},
+    onWhatsAppPassenger: (BookingWithProfile) -> Unit = {},
+    onProfilePassenger: (BookingWithProfile) -> Unit = {}
 ) {
     val statusColor = rideStatusColor(ride.status)
     var showMenu by remember { mutableStateOf(false) }
+    var showPassengers by remember { mutableStateOf(false) }
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
 
-    Box(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .graphicsLayer {
                 scaleX = if (isPressed) 0.985f else 1f
                 scaleY = if (isPressed) 0.985f else 1f
-            }
-            .drawBehind {
-                drawRoundRect(
-                    color = statusColor.copy(alpha = 0.25f),
-                    cornerRadius = CornerRadius(20.dp.toPx()),
-                    style = Stroke(width = 6f)
-                )
             }
             .background(Cavern, RoundedCornerShape(20.dp))
             .border(1.dp, GlassEdgeMid, RoundedCornerShape(20.dp))
@@ -371,128 +437,329 @@ fun MyRideCard(
                 onClick = onClick
             )
     ) {
-        // Left glowing accent
+        Box(modifier = Modifier.fillMaxWidth()) {
+            // Left glowing accent
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .width(5.dp)
+                    .height(140.dp) // Approximate height for the main info
+                    .clip(RoundedCornerShape(topStart = 20.dp, bottomStart = 0.dp))
+                    .background(Brush.verticalGradient(listOf(statusColor, statusColor.copy(0.7f))))
+            )
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 20.dp, end = 16.dp, top = 16.dp, bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Header (same as before)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(46.dp)
+                                .background(statusColor.copy(alpha = 0.12f), CircleShape)
+                                .border(1.5.dp, statusColor.copy(alpha = 0.45f), CircleShape)
+                                .clip(CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (!ride.rider_avatar_url.isNullOrBlank()) {
+                                AsyncImage(
+                                    model = ride.rider_avatar_url,
+                                    contentDescription = null,
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+                            } else {
+                                Text(
+                                    text = ride.rider_name.firstOrNull()?.uppercaseChar()?.toString() ?: "R",
+                                    color = statusColor,
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(
+                                text = ride.rider_name,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = TextPrimary
+                            )
+                            Text(
+                                text = ride.rider_phone ?: "—",
+                                fontSize = 12.5.sp,
+                                color = TextSecondary
+                            )
+                        }
+                    }
+
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        // Status Badge
+                        Box(
+                            modifier = Modifier
+                                .background(statusColor.copy(alpha = 0.12f), RoundedCornerShape(20.dp))
+                                .border(1.dp, statusColor.copy(alpha = 0.5f), RoundedCornerShape(20.dp))
+                                .padding(horizontal = 12.dp, vertical = 5.dp)
+                        ) {
+                            Text(
+                                text = rideStatusLabel(ride.status),
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = statusColor,
+                                letterSpacing = 0.4.sp
+                            )
+                        }
+
+                        // Menu Button
+                        IconButton(onClick = { showMenu = true }) {
+                            Icon(Icons.Default.MoreVert, contentDescription = "Options", tint = TextSecondary)
+                        }
+
+                        DropdownMenu(
+                            expanded = showMenu,
+                            onDismissRequest = { showMenu = false },
+                            modifier = Modifier.background(Crater)
+                        ) {
+                            if (isDriver) {
+                                if (ride.status != "completed" && ride.status != "cancelled") {
+                                    NightMenuItem(Icons.Default.CheckCircle, "Complete Ride", MintPrimary) { showMenu = false; onComplete() }
+                                    NightMenuItem(Icons.Default.Edit, "Edit Ride", CyanPrimary) { showMenu = false; onEdit() }
+                                }
+                                NightMenuItem(Icons.Default.Delete, "Delete Ride", RedPrimary) { showMenu = false; onDelete() }
+                            } else {
+                                if (ride.status != "completed" && ride.status != "cancelled") {
+                                    NightMenuItem(Icons.Default.Close, "Cancel Booking", RedPrimary) { showMenu = false; onCancel() }
+                                } else if (ride.status == "completed") {
+                                    NightMenuItem(Icons.Default.Star, "Rate Driver", GoldAccent) { showMenu = false; onRateDriver() }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Route
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    RideInfoRow(Icons.Default.MyLocation, ride.pickup_location ?: "—", CyanPrimary)
+                    RideInfoRow(Icons.Default.LocationOn, ride.destination ?: "—", CoralPrimary)
+                }
+
+                // Meta
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    ride.departure_date?.let {
+                        MetaChip(Icons.Default.CalendarToday, it, PurpleAccent)
+                    }
+                    ride.departure_time?.let {
+                        MetaChip(Icons.Default.Schedule, it, GoldAccent)
+                    }
+                    MetaChip(Icons.Default.AirlineSeatReclineNormal, "${ride.seats_left} seats left", MintPrimary)
+                }
+            }
+        }
+
+        // Passenger Section for Drivers
+        if (isDriver && bookings.isNotEmpty()) {
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp), color = GlassEdge, thickness = 1.dp)
+            
+            Column(modifier = Modifier.padding(20.dp)) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showPassengers = !showPassengers },
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Passengers (${bookings.size})",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = CyanPrimary
+                    )
+                    Icon(
+                        if (showPassengers) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                        contentDescription = null,
+                        tint = CyanPrimary
+                    )
+                }
+
+                if (showPassengers) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    bookings.forEach { booking ->
+                        PassengerRow(
+                            booking = booking,
+                            showRateButton = ride.status == "completed",
+                            onRate = { onRatePassenger(booking) },
+                            onWhatsApp = { onWhatsAppPassenger(booking) },
+                            onProfile = { onProfilePassenger(booking) }
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun PassengerRow(
+    booking: BookingWithProfile,
+    showRateButton: Boolean = false,
+    onRate: () -> Unit = {},
+    onWhatsApp: () -> Unit = {},
+    onProfile: () -> Unit = {}
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Crater, RoundedCornerShape(12.dp))
+            .clickable { onProfile() }
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
         Box(
             modifier = Modifier
-                .align(Alignment.CenterStart)
-                .width(5.dp)
-                .fillMaxHeight()
-                .clip(RoundedCornerShape(topStart = 20.dp, bottomStart = 20.dp))
-                .background(Brush.verticalGradient(listOf(statusColor, statusColor.copy(0.7f))))
-        )
+                .size(36.dp)
+                .background(PurpleAccent.copy(alpha = 0.1f), CircleShape)
+                .clip(CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            if (!booking.avatar_url.isNullOrBlank()) {
+                AsyncImage(
+                    model = booking.avatar_url,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Text(
+                    text = booking.full_name.firstOrNull()?.uppercaseChar()?.toString() ?: "P",
+                    color = PurpleAccent,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
 
+        Column(modifier = Modifier.weight(1f)) {
+            Text(booking.full_name, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = TextPrimary)
+            Text(booking.phone_number ?: "No phone", fontSize = 12.sp, color = TextSecondary)
+        }
+
+        if (showRateButton) {
+            IconButton(onClick = onRate, modifier = Modifier.size(32.dp)) {
+                Icon(Icons.Default.Star, contentDescription = "Rate Passenger", tint = GoldAccent, modifier = Modifier.size(20.dp))
+            }
+        } else {
+            IconButton(
+                onClick = onWhatsApp,
+                modifier = Modifier
+                    .size(36.dp)
+                    .background(MintPrimary.copy(alpha = 0.1f), CircleShape)
+            ) {
+                Icon(
+                    Icons.Default.Chat,
+                    contentDescription = "WhatsApp",
+                    tint = MintPrimary,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+
+            Box(
+                modifier = Modifier
+                    .background(MintPrimary.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Text(
+                    booking.status.uppercase(),
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MintPrimary
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun RatingDialog(
+    targetName: String,
+    onDismiss: () -> Unit,
+    onSubmit: (Int, String) -> Unit
+) {
+    var rating by remember { mutableIntStateOf(5) }
+    var comment by remember { mutableStateOf("") }
+
+    Dialog(onDismissRequest = onDismiss) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 20.dp, end = 16.dp, top = 16.dp, bottom = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .background(Crater, RoundedCornerShape(20.dp))
+                .border(1.dp, GlassEdge, RoundedCornerShape(20.dp))
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Header
+            Text("Rate $targetName", color = TextHero, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                repeat(5) { index ->
+                    val starLevel = index + 1
+                    IconButton(onClick = { rating = starLevel }) {
+                        Icon(
+                            if (starLevel <= rating) Icons.Default.Star else Icons.Default.StarBorder,
+                            contentDescription = null,
+                            tint = if (starLevel <= rating) GoldAccent else TextMuted,
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+                }
+            }
+
+            OutlinedTextField(
+                value = comment,
+                onValueChange = { comment = it },
+                placeholder = { Text("Add a comment (optional)", color = TextMuted) },
+                modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = TextPrimary,
+                    unfocusedTextColor = TextPrimary,
+                    cursorColor = CyanPrimary,
+                    focusedBorderColor = CyanPrimary,
+                    unfocusedBorderColor = GlassEdge
+                ),
+                shape = RoundedCornerShape(12.dp)
+            )
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.weight(1f)
+                TextButton(onClick = onDismiss, modifier = Modifier.weight(1f)) {
+                    Text("Cancel", color = TextSecondary)
+                }
+                Button(
+                    onClick = { onSubmit(rating, comment) },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = CyanPrimary),
+                    shape = RoundedCornerShape(12.dp)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(46.dp)
-                            .background(statusColor.copy(alpha = 0.12f), CircleShape)
-                            .border(1.5.dp, statusColor.copy(alpha = 0.45f), CircleShape)
-                            .clip(CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (!ride.rider_avatar_url.isNullOrBlank()) {
-                            AsyncImage(
-                                model = ride.rider_avatar_url,
-                                contentDescription = null,
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop
-                            )
-                        } else {
-                            Text(
-                                text = ride.rider_name.firstOrNull()?.uppercaseChar()?.toString() ?: "R",
-                                color = statusColor,
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-
-                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(
-                            text = ride.rider_name,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = TextPrimary
-                        )
-                        Text(
-                            text = ride.rider_phone ?: "—",
-                            fontSize = 12.5.sp,
-                            color = TextSecondary
-                        )
-                    }
+                    Text("Submit", color = Abyss, fontWeight = FontWeight.Bold)
                 }
-
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    // Status Badge
-                    Box(
-                        modifier = Modifier
-                            .background(statusColor.copy(alpha = 0.12f), RoundedCornerShape(20.dp))
-                            .border(1.dp, statusColor.copy(alpha = 0.5f), RoundedCornerShape(20.dp))
-                            .padding(horizontal = 12.dp, vertical = 5.dp)
-                    ) {
-                        Text(
-                            text = rideStatusLabel(ride.status),
-                            fontSize = 11.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = statusColor,
-                            letterSpacing = 0.4.sp
-                        )
-                    }
-
-                    // Menu Button
-                    IconButton(onClick = { showMenu = true }) {
-                        Icon(Icons.Default.MoreVert, contentDescription = "Options", tint = TextSecondary)
-                    }
-
-                    DropdownMenu(
-                        expanded = showMenu,
-                        onDismissRequest = { showMenu = false },
-                        modifier = Modifier.background(Crater)
-                    ) {
-                        if (isDriver) {
-                            NightMenuItem(Icons.Default.Edit, "Edit Ride", CyanPrimary) { showMenu = false; onEdit() }
-                            NightMenuItem(Icons.Default.Delete, "Delete Ride", RedPrimary) { showMenu = false; onDelete() }
-                        } else {
-                            NightMenuItem(Icons.Default.Close, "Cancel Booking", RedPrimary) { showMenu = false; onCancel() }
-                        }
-                    }
-                }
-            }
-
-            // Route
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                RideInfoRow(Icons.Default.MyLocation, ride.pickup_location ?: "—", CyanPrimary)
-                RideInfoRow(Icons.Default.LocationOn, ride.destination ?: "—", CoralPrimary)
-            }
-
-            // Meta
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                ride.departure_date?.let {
-                    MetaChip(Icons.Default.CalendarToday, it, PurpleAccent)
-                }
-                ride.departure_time?.let {
-                    MetaChip(Icons.Default.Schedule, it, GoldAccent)
-                }
-                MetaChip(Icons.Default.AirlineSeatReclineNormal, "${ride.seats_left} seats left", MintPrimary)
             }
         }
     }

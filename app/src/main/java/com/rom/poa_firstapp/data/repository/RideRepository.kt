@@ -3,9 +3,13 @@ package com.rom.poa_firstapp.data.repository
 import com.rom.poa_firstapp.data.model.Ride
 import com.rom.poa_firstapp.data.model.RiderProfile
 import com.rom.poa_firstapp.data.model.Booking
+import com.rom.poa_firstapp.data.model.BookingWithProfile
 import android.util.Log
 import io.github.jan.supabase.SupabaseClient
+import io.github.jan.supabase.postgrest.postgrest
+import io.github.jan.supabase.postgrest.rpc
 import io.github.jan.supabase.postgrest.from
+import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.realtime.PostgresAction
 import io.github.jan.supabase.realtime.Realtime
 import io.github.jan.supabase.realtime.channel
@@ -13,6 +17,7 @@ import io.github.jan.supabase.realtime.postgresChangeFlow
 import io.github.jan.supabase.realtime.realtime
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -30,6 +35,9 @@ interface RideRepository {
     suspend fun cancelBooking(rideId: String, userId: String): Result<Unit>
     suspend fun deleteRide(rideId: String): Result<Unit>
     suspend fun updateRide(ride: Ride): Result<Unit>
+    suspend fun updateRideStatus(rideId: String, status: String): Result<Unit>
+    suspend fun getRideBookings(rideId: String): List<BookingWithProfile>
+    suspend fun submitRating(rating: com.rom.poa_firstapp.data.model.Rating): Result<Unit>
 }
 
 class RideRepositoryImpl(
@@ -37,11 +45,13 @@ class RideRepositoryImpl(
 ) : RideRepository {
     
     override fun getRidesFlow(): Flow<PostgresAction> {
-        val channel = supabaseClient.realtime.channel("rides_channel")
+        val channel = supabaseClient.realtime.channel("rides_channel_${java.util.UUID.randomUUID()}")
         return channel.postgresChangeFlow<PostgresAction>(schema = "public") {
             table = "rides"
         }.onStart {
             channel.subscribe()
+        }.onCompletion {
+            channel.unsubscribe()
         }
     }
 
@@ -52,9 +62,15 @@ class RideRepositoryImpl(
 
     override suspend fun getAllRides(): List<Ride> = withContext(Dispatchers.IO) {
         try {
-            // Fetch all rides
+            // Fetch only active rides with seats available
             val rides = supabaseClient.from("rides")
-                .select()
+                .select {
+                    filter {
+                        neq("status", "completed")
+                        neq("status", "cancelled")
+                        gt("seats_left", 0)
+                    }
+                }
                 .decodeList<Ride>()
 
             if (rides.isEmpty()) {
@@ -128,38 +144,26 @@ class RideRepositoryImpl(
 
     override suspend fun bookRide(rideId: String, userId: String): Result<Unit> {
         return try {
-            // 1. Check if seats available
-            val ride = getRideById(rideId) ?: throw Exception("Ride not found")
-            if (ride.seats_left <= 0) throw Exception("No seats available")
-
-            // 2. Decrement seats
-            supabaseClient.from("rides").update(
-                mapOf("seats_left" to ride.seats_left - 1)
-            ) {
-                filter { eq("id", rideId) }
+            val booking = Booking(
+                ride_id = rideId,
+                user_id = userId,
+                status = "booked"
+            )
+            supabaseClient.from("bookings").insert(booking)
+            
+            // Decrement seats_left in the rides table
+            val ride = getRideById(rideId)
+            if (ride != null && ride.seats_left > 0) {
+                supabaseClient.from("rides").update({
+                    set("seats_left", ride.seats_left - 1)
+                }) {
+                    filter { eq("id", rideId) }
+                }
             }
-
-            // 3. Create booking record (assuming a 'bookings' table exists)
-            supabaseClient.from("bookings").insert(
-                mapOf(
-                    "ride_id" to rideId,
-                    "user_id" to userId,
-                    "status" to "confirmed"
-                )
-            )
-
-            // 4. (Notification logic would go here, e.g., inserting into a notifications table)
-            supabaseClient.from("notifications").insert(
-                mapOf(
-                    "user_id" to ride.rider_id,
-                    "title" to "New Booking!",
-                    "message" to "A seat has been booked for your ride to ${ride.destination}",
-                    "type" to "booking"
-                )
-            )
 
             Result.success(Unit)
         } catch (e: Exception) {
+            Log.e("RideRepo", "Booking failed", e)
             Result.failure(e)
         }
     }
@@ -168,6 +172,9 @@ class RideRepositoryImpl(
         try {
             supabaseClient.from("rides").select {
                 filter {
+                    neq("status", "completed")
+                    neq("status", "cancelled")
+                    gt("seats_left", 0)
                     or {
                         ilike("destination", "%$query%")
                         ilike("pickup_location", "%$query%")
@@ -193,57 +200,45 @@ class RideRepositoryImpl(
 
     override suspend fun getUserBookedRides(userId: String): List<Ride> {
         return try {
-            // This is a bit simplified; ideally we'd use a join or view
+            Log.d("RideRepo", "Fetching booked rides for user: $userId")
+            // 1. Get bookings for this user
             val bookings = supabaseClient.from("bookings").select {
                 filter {
                     eq("user_id", userId)
                 }
             }.decodeList<Booking>()
             
-            val rideIds = bookings.map { it.ride_id }
+            Log.d("RideRepo", "Found ${bookings.size} bookings")
+            
+            val rideIds = bookings.map { it.ride_id }.distinct()
             if (rideIds.isEmpty()) return emptyList()
             
-            supabaseClient.from("rides").select {
+            // 2. Get the actual ride details for those bookings
+            val rides = supabaseClient.from("rides").select {
                 filter {
                     isIn("id", rideIds)
                 }
             }.decodeList<Ride>()
+            
+            Log.d("RideRepo", "Successfully fetched ${rides.size} booked rides")
+            rides
         } catch (e: Exception) {
+            Log.e("RideRepo", "Error in getUserBookedRides", e)
             emptyList()
         }
     }
 
     override suspend fun cancelBooking(rideId: String, userId: String): Result<Unit> {
         return try {
-            val ride = getRideById(rideId) ?: throw Exception("Ride not found")
-
-            // 1. Delete the booking
             supabaseClient.from("bookings").delete {
                 filter {
                     eq("ride_id", rideId)
                     eq("user_id", userId)
                 }
             }
-
-            // 2. Increment seats back
-            supabaseClient.from("rides").update(
-                mapOf("seats_left" to ride.seats_left + 1)
-            ) {
-                filter { eq("id", rideId) }
-            }
-
-            // 3. Notify the driver
-            supabaseClient.from("notifications").insert(
-                mapOf(
-                    "user_id" to ride.rider_id,
-                    "title" to "Booking Cancelled",
-                    "message" to "A passenger has cancelled their booking for your ride to ${ride.destination}",
-                    "type" to "cancellation"
-                )
-            )
-
             Result.success(Unit)
         } catch (e: Exception) {
+            Log.e("RideRepo", "Cancellation failed", e)
             Result.failure(e)
         }
     }
@@ -266,6 +261,64 @@ class RideRepositoryImpl(
             }
             Result.success(Unit)
         } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun updateRideStatus(rideId: String, status: String): Result<Unit> {
+        return try {
+            supabaseClient.from("rides").update({
+                set("status", status)
+            }) {
+                filter { eq("id", rideId) }
+            }
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun getRideBookings(rideId: String): List<BookingWithProfile> {
+        return try {
+            // Fetch bookings first
+            val bookings = supabaseClient.from("bookings").select {
+                filter { eq("ride_id", rideId) }
+            }.decodeList<Booking>()
+
+            if (bookings.isEmpty()) return emptyList()
+
+            // Fetch profiles for these bookings
+            val userIds = bookings.map { it.user_id }.distinct()
+            val profiles = supabaseClient.from("profiles").select {
+                filter { isIn("id", userIds) }
+            }.decodeList<com.rom.poa_firstapp.data.model.RiderProfile>()
+
+            // Map to BookingWithProfile
+            bookings.mapNotNull { booking ->
+                val profile = profiles.find { it.id == booking.user_id }
+                if (profile != null) {
+                    BookingWithProfile(
+                        id = booking.id ?: 0,
+                        user_id = booking.user_id,
+                        full_name = profile.full_name,
+                        phone_number = profile.phone_number,
+                        avatar_url = profile.avatar_url,
+                        status = booking.status
+                    )
+                } else null
+            }
+        } catch (e: Exception) {
+            Log.e("RideRepo", "Error fetching bookings", e)
+            emptyList()
+        }
+    }
+
+    override suspend fun submitRating(rating: com.rom.poa_firstapp.data.model.Rating): Result<Unit> {
+        return try {
+            supabaseClient.from("ratings").insert(rating)
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e("RideRepo", "Error submitting rating", e)
             Result.failure(e)
         }
     }

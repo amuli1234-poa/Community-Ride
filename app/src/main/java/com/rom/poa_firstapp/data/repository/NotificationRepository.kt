@@ -8,6 +8,8 @@ import io.github.jan.supabase.realtime.channel
 import io.github.jan.supabase.realtime.postgresChangeFlow
 import io.github.jan.supabase.realtime.realtime
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.onCompletion
+import kotlinx.coroutines.flow.onStart
 
 interface NotificationRepository {
     fun getNotificationsFlow(userId: String): Flow<PostgresAction>
@@ -21,9 +23,13 @@ class NotificationRepositoryImpl(
 ) : NotificationRepository {
 
     override fun getNotificationsFlow(userId: String): Flow<PostgresAction> {
-        val channel = supabaseClient.realtime.channel("notifications_$userId")
+        val channel = supabaseClient.realtime.channel("notifications_${userId}_${java.util.UUID.randomUUID()}")
         return channel.postgresChangeFlow<PostgresAction>(schema = "public") {
             table = "notifications"
+        }.onStart {
+            channel.subscribe()
+        }.onCompletion {
+            channel.unsubscribe()
         }
     }
 

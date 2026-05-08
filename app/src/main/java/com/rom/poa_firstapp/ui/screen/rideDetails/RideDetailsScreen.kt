@@ -101,6 +101,7 @@ fun RideDetailsScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val currentUserId = remember { SupabaseModule.client.auth.currentSessionOrNull()?.user?.id }
     val viewModel: RideDetailsViewModel = viewModel(
         factory = RideDetailsViewModelFactory(
             rideId,
@@ -174,17 +175,81 @@ fun RideDetailsScreen(
                 RDSectionLabel("TRIP INFO")
                 TripInfoGrid(ride = r)
 
+                if (r.status == "completed") {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MintPrimary.copy(alpha = 0.1f))
+                            .border(1.dp, MintPrimary.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                            .padding(16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(Icons.Default.CheckCircle, null, tint = MintPrimary)
+                            Text("This ride has been completed", color = MintPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        }
+                    }
+                }
+
                 // Rider card
                 RDSectionLabel("RIDER")
                 RiderCard(ride = r, onViewProfile = {
-                    navController.currentBackStackEntry?.savedStateHandle?.set("profileId", r.rider_id)
-                    navController.navigate(ROUTES.Profile.name)
+                    navController.navigate("${ROUTES.Profile.name}?profileId=${r.rider_id}")
                 })
+
+                // Bookings section (only for owner)
+                if (currentUserId == r.rider_id) {
+                    RDSectionLabel("BOOKED PASSENGERS (${viewModel.bookings.size})")
+                    if (viewModel.bookings.isEmpty()) {
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(14.dp),
+                            color = Cavern,
+                            border = BorderStroke(1.dp, GlassEdge)
+                        ) {
+                            Text(
+                                "No passengers have booked this ride yet.",
+                                color = TextSecondary,
+                                fontSize = 13.sp,
+                                modifier = Modifier.padding(16.dp),
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    } else {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            viewModel.bookings.forEach { booking ->
+                                PassengerBookingCard(
+                                    booking = booking,
+                                    onWhatsApp = {
+                                        val rawPhone = booking.phone_number?.filter { it.isDigit() } ?: ""
+                                        val phone = when {
+                                            rawPhone.startsWith("254") -> rawPhone
+                                            rawPhone.startsWith("0")   -> "254" + rawPhone.substring(1)
+                                            rawPhone.length == 9       -> "254$rawPhone"
+                                            else                       -> rawPhone
+                                        }
+                                        val text = "Hello ${booking.full_name}, I'm the driver for your ride to ${r.destination}."
+                                        try {
+                                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://api.whatsapp.com/send?phone=$phone&text=${Uri.encode(text)}")))
+                                        } catch (e: Exception) {
+                                            Toast.makeText(context, "Could not open WhatsApp", Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
+                                    onProfile = {
+                                        navController.navigate("${ROUTES.Profile.name}?profileId=${booking.user_id}")
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
 
                 // Action buttons
                 ActionButtons(
                     ride      = r,
                     isBooking = isBooking,
+                    isOwner   = currentUserId == r.rider_id,
                     onMessage = {
                         val rawPhone = r.rider_phone.filter { it.isDigit() }
                         val phone = when {
@@ -194,7 +259,6 @@ fun RideDetailsScreen(
                             else                       -> rawPhone
                         }
                         val text = "Hello ${r.rider_name}, I'm interested in your ride to ${r.destination}."
-                        val currentUserId = SupabaseModule.client.auth.currentSessionOrNull()?.user?.id
                         if (currentUserId != null) {
                             viewModel.startWhatsAppConversation(currentUserId, text) {
                                 try {
@@ -206,12 +270,13 @@ fun RideDetailsScreen(
                         }
                     },
                     onBook = {
-                        val userId = SupabaseModule.client.auth.currentUserOrNull()?.id
-                        if (userId != null) {
-                            viewModel.bookRide(userId) { result ->
+                        if (currentUserId != null) {
+                            viewModel.bookRide(currentUserId) { result ->
                                 if (result.isSuccess) {
                                     Toast.makeText(context, "Ride booked successfully! 🚗", Toast.LENGTH_LONG).show()
-                                    navController.popBackStack()
+                                    navController.navigate(ROUTES.MyRides.name) {
+                                        popUpTo(ROUTES.Home.name)
+                                    }
                                 } else {
                                     Toast.makeText(context, "Error: ${result.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
                                 }
@@ -221,6 +286,21 @@ fun RideDetailsScreen(
                         }
                     }
                 )
+
+                if (r.status == "completed") {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Button(
+                        onClick = { navController.navigate("${ROUTES.Profile.name}?profileId=${r.rider_id}") },
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Cavern),
+                        border = BorderStroke(1.dp, GoldAccent.copy(alpha = 0.5f))
+                    ) {
+                        Icon(Icons.Default.Star, null, tint = GoldAccent, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Rate Rider", color = GoldAccent, fontWeight = FontWeight.Bold)
+                    }
+                }
             }
         }
     }
@@ -236,15 +316,6 @@ private fun RideHero(ride: Ride) {
         modifier = Modifier
             .fillMaxWidth()
             .background(Cavern)
-            .drawBehind {
-                // Grid lines
-                val lineColor = Color.White.copy(alpha = 0.03f)
-                val step = 28.dp.toPx()
-                var x = 0f
-                while (x < size.width) { drawLine(lineColor, Offset(x, 0f), Offset(x, size.height), 1f); x += step }
-                var y = 0f
-                while (y < size.height) { drawLine(lineColor, Offset(0f, y), Offset(size.width, y), 1f); y += step }
-            }
     ) {
         // Ambient glow blobs
         Box(modifier = Modifier.size(180.dp).offset(x = 220.dp, y = (-40).dp).clip(CircleShape).background(Brush.radialGradient(listOf(CyanPrimary.copy(alpha = 0.18f), Color.Transparent))))
@@ -439,6 +510,83 @@ private fun RiderCard(ride: Ride, onViewProfile: () -> Unit) {
     }
 }
 
+@Composable
+private fun PassengerBookingCard(
+    booking: com.rom.poa_firstapp.data.model.BookingWithProfile,
+    onWhatsApp: () -> Unit,
+    onProfile: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = onProfile,
+        shape = RoundedCornerShape(16.dp),
+        color = Cavern,
+        border = BorderStroke(1.dp, GlassEdge)
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Avatar
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(Crater)
+                    .border(1.dp, CyanPrimary.copy(alpha = 0.2f), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                if (booking.avatar_url != null) {
+                    AsyncImage(
+                        model = booking.avatar_url,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Icon(Icons.Default.Person, null, tint = TextSecondary, modifier = Modifier.size(20.dp))
+                }
+            }
+            
+            Spacer(Modifier.width(12.dp))
+            
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    booking.full_name,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                    color = TextPrimary
+                )
+                Text(
+                    booking.status.uppercase(),
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = when(booking.status.lowercase()) {
+                        "confirmed" -> MintPrimary
+                        else -> GoldAccent
+                    }
+                )
+            }
+
+            // WhatsApp Button
+            IconButton(
+                onClick = onWhatsApp,
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(MintPrimary.copy(alpha = 0.1f))
+            ) {
+                Icon(
+                    Icons.Default.Chat,
+                    contentDescription = "WhatsApp",
+                    tint = MintPrimary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+    }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Action buttons
 // ─────────────────────────────────────────────────────────────────────────────
@@ -446,6 +594,7 @@ private fun RiderCard(ride: Ride, onViewProfile: () -> Unit) {
 private fun ActionButtons(
     ride: Ride,
     isBooking: Boolean,
+    isOwner: Boolean,
     onMessage: () -> Unit,
     onBook: () -> Unit
 ) {
@@ -456,10 +605,11 @@ private fun ActionButtons(
         // Message button
         OutlinedButton(
             onClick  = onMessage,
+            enabled  = !isOwner,
             modifier = Modifier.weight(1f).height(52.dp),
             shape    = RoundedCornerShape(14.dp),
-            border   = BorderStroke(1.5.dp, CyanPrimary.copy(alpha = 0.4f)),
-            colors   = ButtonDefaults.outlinedButtonColors(contentColor = CyanPrimary)
+            border   = BorderStroke(1.5.dp, if (isOwner) TextMuted else CyanPrimary.copy(alpha = 0.4f)),
+            colors   = ButtonDefaults.outlinedButtonColors(contentColor = if (isOwner) TextMuted else CyanPrimary)
         ) {
             Icon(Icons.Default.Chat, null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(6.dp))
@@ -469,7 +619,7 @@ private fun ActionButtons(
         // Book button
         Button(
             onClick  = onBook,
-            enabled  = !isBooking && ride.seats_left > 0,
+            enabled  = !isBooking && !isOwner && ride.seats_left > 0 && ride.status != "completed" && ride.status != "cancelled",
             modifier = Modifier.weight(1.5f).height(52.dp),
             shape    = RoundedCornerShape(14.dp),
             colors   = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
@@ -479,7 +629,7 @@ private fun ActionButtons(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(
-                        if (ride.seats_left > 0)
+                        if (!isOwner && ride.seats_left > 0 && ride.status != "completed" && ride.status != "cancelled")
                             Brush.linearGradient(listOf(CyanPrimary, MintPrimary), Offset(0f, 0f), Offset(Float.POSITIVE_INFINITY, 0f))
                         else
                             Brush.linearGradient(listOf(TextMuted, TextMuted)),
@@ -491,14 +641,28 @@ private fun ActionButtons(
                     CircularProgressIndicator(color = Abyss, modifier = Modifier.size(22.dp), strokeWidth = 2.5.dp)
                 } else {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        val btnIcon = when {
+                            isOwner -> Icons.Default.Person
+                            ride.status == "completed" -> Icons.Default.CheckCircle
+                            ride.status == "cancelled" -> Icons.Default.Block
+                            ride.seats_left > 0 -> Icons.Default.RocketLaunch
+                            else -> Icons.Default.Block
+                        }
+                        val btnText = when {
+                            isOwner -> "Your Ride"
+                            ride.status == "completed" -> "Completed"
+                            ride.status == "cancelled" -> "Cancelled"
+                            ride.seats_left > 0 -> "Book Now"
+                            else -> "Full"
+                        }
                         Icon(
-                            if (ride.seats_left > 0) Icons.Default.RocketLaunch else Icons.Default.Block,
+                            btnIcon,
                             null,
                             tint     = Abyss,
                             modifier = Modifier.size(18.dp)
                         )
                         Text(
-                            if (ride.seats_left > 0) "Book Now" else "Full",
+                            btnText,
                             fontSize   = 15.sp,
                             fontWeight = FontWeight.ExtraBold,
                             color      = Abyss
