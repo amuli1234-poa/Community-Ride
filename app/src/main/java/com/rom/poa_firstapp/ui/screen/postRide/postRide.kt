@@ -7,6 +7,8 @@ import android.content.pm.PackageManager
 import android.location.Geocoder
 import android.util.Log
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -19,363 +21,212 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.*
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import androidx.navigation.compose.rememberNavController
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
-import com.rom.poa_firstapp.data.model.Ride
 import com.rom.poa_firstapp.data.remote.SupabaseModule
 import com.rom.poa_firstapp.data.repository.ProfileRepositoryImpl
 import com.rom.poa_firstapp.data.repository.RideRepositoryImpl
 import com.rom.poa_firstapp.ui.common.ErrorState
 import com.rom.poa_firstapp.ui.common.LoadingState
 import com.rom.poa_firstapp.ui.navigation.ROUTES
-import io.github.jan.supabase.auth.auth
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.*
 
-// ---------------------------------------------------------------------------
-// Colour palette
-// ---------------------------------------------------------------------------
-private val GreenDeep      = Color(0xFF1A3A2A)
-private val GreenMid       = Color(0xFF2D6A4F)
-private val GreenBright    = Color(0xFF40916C)
-private val GreenLight     = Color(0xFF52B788)
-private val GreenPale      = Color(0xFFD4E8D4)
-private val GreenHint      = Color(0xFF74916C)
-private val GreenSurface   = Color(0xFFEAF3DE)
-private val GreenSubBorder = Color(0xFFC0DD97)
-private val PageBg         = Color(0xFFF4F6F3)
-private val CardWhite      = Color(0xFFFFFFFF)
-private val TextPrimary    = Color(0xFF1A1A1A)
+// ─────────────────────────────────────────────────────────────────────────────
+// Design Tokens
+// ─────────────────────────────────────────────────────────────────────────────
+private val Abyss = Color(0xFF080C1C)
+private val Cavern = Color(0xFF0E1325)
+private val Crater = Color(0xFF141929)
+private val GlassEdge = Color(0x18FFFFFF)
+private val GlassEdgeMid = Color(0x30FFFFFF)
 
-// ---------------------------------------------------------------------------
-// Screen
-// ---------------------------------------------------------------------------
+private val CyanPrimary = Color(0xFF00E5FF)
+private val CyanGlow = Color(0x4400E5FF)
+private val CoralPrimary = Color(0xFFFF4D7D)
+private val MintPrimary = Color(0xFF00FFA3)
+private val GoldAccent = Color(0xFFFFBB00)
+private val RedPrimary = Color(0xFFFF3B47)
+private val PurpleAccent = Color(0xFFAA55FF)
+
+private val TextHero = Color(0xFFFFFFFF)
+private val TextPrimary = Color(0xFFE8EEFF)
+private val TextSecondary = Color(0xFF8896B8)
+private val TextMuted = Color(0xFF4A5568)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Main Screen
+// ─────────────────────────────────────────────────────────────────────────────
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PostRideScreen(navController: NavController, rideId: String? = null) {
-    var isPaidRide     by remember { mutableStateOf(false) }
-    var pickupLocation by remember { mutableStateOf("") }
-    var destination    by remember { mutableStateOf("") }
-    var seatsCount     by remember { mutableIntStateOf(3) }
-    var departureTime  by remember { mutableStateOf("") }
-    var departureDate  by remember { mutableStateOf("") }
-    var isLoading      by remember { mutableStateOf(false) }
-    var errorMessage   by remember { mutableStateOf<String?>(null) }
+fun PostRideScreen(
+    navController: NavController,
+    rideId: String? = null
+) {
+    val context = LocalContext.current
+    val viewModel: PostRideViewModel = viewModel {
+        PostRideViewModel(
+            RideRepositoryImpl(SupabaseModule.client),
+            ProfileRepositoryImpl(SupabaseModule.client),
+            SupabaseModule.client,
+            Geocoder(context)
+        )
+    }
 
-    val rideRepository    = remember { RideRepositoryImpl(SupabaseModule.client) }
-    val profileRepository = remember { ProfileRepositoryImpl(SupabaseModule.client) }
-    val scope             = rememberCoroutineScope()
-    val context           = LocalContext.current
-
-    val isEditing = rideId != null
-
-    // Load ride data if editing
-    LaunchedEffect(rideId) {
-        if (rideId != null) {
-            isLoading = true
-            try {
-                val ride = rideRepository.getRideById(rideId)
-                if (ride != null) {
-                    pickupLocation = ride.pickup_location ?: ""
-                    destination = ride.destination ?: ""
-                    seatsCount = ride.seats_left
-                    departureTime = ride.departure_time ?: ""
-                    departureDate = ride.departure_date ?: ""
-                    isPaidRide = ride.status == "Paid"
-                }
-            } catch (e: Exception) {
-                errorMessage = "Failed to load ride: ${e.message}"
-            } finally {
-                isLoading = false
-            }
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (!isGranted) {
+            Toast.makeText(context, "Location permission denied", Toast.LENGTH_SHORT).show()
         }
     }
 
-    // Date / time pickers
+    // Load ride if editing
+    LaunchedEffect(rideId) {
+        viewModel.loadRide(rideId)
+    }
+
+    // Navigation on success
+    LaunchedEffect(viewModel.isSuccess) {
+        if (viewModel.isSuccess) {
+            Toast.makeText(context, if (viewModel.isEditing) "Ride updated!" else "Ride posted!", Toast.LENGTH_SHORT).show()
+            navController.popBackStack()
+        }
+    }
+
     val calendar = Calendar.getInstance()
     val timePicker = TimePickerDialog(context, { _, h, m ->
-        departureTime = String.format("%02d:%02d", h, m)
+        viewModel.departureTime = String.format("%02d:%02d", h, m)
     }, calendar.get(Calendar.HOUR_OF_DAY), calendar.get(Calendar.MINUTE), true)
 
     val datePicker = DatePickerDialog(context, { _, y, mo, d ->
-        departureDate = String.format("%04d-%02d-%02d", y, mo + 1, d)
+        viewModel.departureDate = String.format("%04d-%02d-%02d", y, mo + 1, d)
     }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH))
-
-    fun postRide() {
-        if (pickupLocation.isBlank() || destination.isBlank() ||
-            departureTime.isBlank() || departureDate.isBlank()) {
-            errorMessage = "Please fill in pickup, destination, time, and date."
-            return
-        }
-        scope.launch {
-            isLoading    = true
-            errorMessage = null
-            try {
-                val currentUser = SupabaseModule.client.auth.currentSessionOrNull()?.user
-                    ?: run { errorMessage = "Session expired. Please login again."; isLoading = false; return@launch }
-
-                val profile = profileRepository.getProfile(currentUser.id)
-                    ?: run { errorMessage = "Profile not found. Please complete setup."; isLoading = false; return@launch }
-
-                val geocoder = Geocoder(context, Locale.getDefault())
-                val pickupCoords = withContext(Dispatchers.IO) {
-                    try { geocoder.getFromLocationName(pickupLocation, 1)?.firstOrNull() }
-                    catch (e: Exception) { Log.e("PostRide", "Pickup geocode", e); null }
-                }
-                val destCoords = withContext(Dispatchers.IO) {
-                    try { geocoder.getFromLocationName(destination, 1)?.firstOrNull() }
-                    catch (e: Exception) { Log.e("PostRide", "Dest geocode", e); null }
-                }
-
-                if (pickupCoords == null) { errorMessage = "Could not find pickup location. Please be more specific."; isLoading = false; return@launch }
-                if (destCoords   == null) { errorMessage = "Could not find destination. Please be more specific.";    isLoading = false; return@launch }
-
-                val rawPhone = profile.phone_number?.filter { it.isDigit() } ?: ""
-                val formattedPhone = when {
-                    rawPhone.startsWith("254") -> rawPhone
-                    rawPhone.startsWith("0") -> "254" + rawPhone.substring(1)
-                    rawPhone.length == 9 -> "254$rawPhone"
-                    else -> rawPhone.ifBlank { "Contact via app" }
-                }
-
-                val ride = Ride(
-                    id                   = rideId ?: UUID.randomUUID().toString(),
-                    rider_id             = currentUser.id,
-                    rider_name           = profile.full_name,
-                    seats_left           = seatsCount,
-                    rider_phone          = formattedPhone,
-                    start_lat            = pickupCoords.latitude,
-                    start_lng            = pickupCoords.longitude,
-                    status               = if (isPaidRide) "Paid" else "Free",
-                    pickup_location      = pickupLocation,
-                    destination          = destination,
-                    departure_time       = departureTime,
-                    departure_date       = departureDate,
-                    destination_lat      = destCoords.latitude,
-                    destination_lng      = destCoords.longitude
-                )
-                
-                val result = if (isEditing) {
-                    rideRepository.updateRide(ride)
-                } else {
-                    rideRepository.postRide(ride)
-                }
-
-                result.onSuccess {
-                        navController.navigate(ROUTES.Home.name) {
-                            popUpTo(ROUTES.PostRide.name) { inclusive = true }
-                        }
-                        Toast.makeText(context, if(isEditing) "Ride updated!" else "Ride posted!", Toast.LENGTH_SHORT).show()
-                    }
-                    .onFailure { e ->
-                        errorMessage = "Failed: ${e.localizedMessage}"
-                        Log.e("PostRide", "Action failed", e)
-                    }
-            } catch (e: Exception) {
-                errorMessage = e.localizedMessage ?: "Unexpected error"
-            } finally {
-                isLoading = false
-            }
-        }
-    }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {
-                    Text(if (isEditing) "Edit Ride" else "Post a Ride", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 17.sp)
-                },
+                title = { Text(if (viewModel.isEditing) "Edit Ride" else "Post a Ride", fontWeight = FontWeight.Bold, color = TextHero) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = TextPrimary)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = GreenDeep)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Abyss)
             )
         },
-        containerColor = PageBg
+        containerColor = Abyss
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
 
-                // ── Hero ─────────────────────────────────────────────────
                 PostRideHero()
 
-                // ── Form ─────────────────────────────────────────────────
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(PageBg)
                         .padding(horizontal = 20.dp)
-                        .padding(top = 20.dp, bottom = 36.dp),
-                    verticalArrangement = Arrangement.spacedBy(0.dp)
+                        .padding(top = 24.dp, bottom = 40.dp),
+                    verticalArrangement = Arrangement.spacedBy(24.dp)
                 ) {
-
-                    // Route
-                    PRSectionLabel("ROUTE DETAILS")
-                    Spacer(Modifier.height(10.dp))
+                    PRSectionLabel("ROUTE")
                     RouteField(
-                        value         = pickupLocation,
-                        onValueChange = { pickupLocation = it },
-                        placeholder   = "Pickup location",
-                        leadIcon      = Icons.Default.LocationOn,
+                        value = viewModel.pickupLocation,
+                        onValueChange = { viewModel.pickupLocation = it },
+                        placeholder = "Pickup Location",
+                        leadIcon = Icons.Default.MyLocation,
+                        accentColor = CyanPrimary,
                         onTrailingClick = {
-                            val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
                             if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-                                fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
+                                val fused = LocationServices.getFusedLocationProviderClient(context)
+                                fused.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
                                     .addOnSuccessListener { loc ->
                                         loc?.let {
-                                            val geocoder = Geocoder(context, Locale.getDefault())
-                                            scope.launch(Dispatchers.IO) {
-                                                val address = try { geocoder.getFromLocation(it.latitude, it.longitude, 1)?.firstOrNull()?.getAddressLine(0) } catch (e: Exception) { null }
-                                                withContext(Dispatchers.Main) { if (address != null) pickupLocation = address }
-                                            }
+                                            viewModel.updatePickupFromLocation(it.latitude, it.longitude)
                                         }
                                     }
                             } else {
-                                errorMessage = "Location permission denied. Please enable it in settings."
+                                permissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
                             }
                         }
                     )
-                    // Swap connector
-                    Box(Modifier.fillMaxWidth().padding(vertical = 4.dp), contentAlignment = Alignment.Center) {
-                        Box(Modifier.width(1.5.dp).height(20.dp).background(GreenPale))
+
+                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                         IconButton(
                             onClick = {
-                                val temp = pickupLocation
-                                pickupLocation = destination
-                                destination = temp
+                                val temp = viewModel.pickupLocation
+                                viewModel.pickupLocation = viewModel.destination
+                                viewModel.destination = temp
                             },
-                            modifier = Modifier.size(26.dp).clip(CircleShape).background(GreenBright)
+                            modifier = Modifier.size(38.dp).background(CyanGlow, CircleShape)
                         ) {
-                            Icon(Icons.Default.SwapVert, null, tint = Color.White, modifier = Modifier.size(14.dp))
+                            Icon(Icons.Default.SwapVert, null, tint = CyanPrimary)
                         }
                     }
-                    RouteField(
-                        value         = destination,
-                        onValueChange = { destination = it },
-                        placeholder   = "Destination",
-                        leadIcon      = Icons.Default.Flag
-                    )
 
-                    Spacer(Modifier.height(20.dp))
+                    RouteField(viewModel.destination, { viewModel.destination = it }, "Destination", Icons.Default.LocationOn, CoralPrimary)
 
-                    // Schedule
                     PRSectionLabel("SCHEDULE")
-                    Spacer(Modifier.height(10.dp))
-                    Row(
-                        modifier              = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        ScheduleCard(
-                            label     = "TIME",
-                            value     = departureTime.ifBlank { "Select time" },
-                            icon      = Icons.Default.AccessTime,
-                            isFilled  = departureTime.isNotBlank(),
-                            modifier  = Modifier.weight(1f),
-                            onClick   = { timePicker.show() }
-                        )
-                        ScheduleCard(
-                            label     = "DATE",
-                            value     = departureDate.ifBlank { "Select date" },
-                            icon      = Icons.Default.DateRange,
-                            isFilled  = departureDate.isNotBlank(),
-                            modifier  = Modifier.weight(1f),
-                            onClick   = { datePicker.show() }
-                        )
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        ScheduleCard("TIME", viewModel.departureTime.ifBlank { "Select Time" }, Icons.Default.Schedule, GoldAccent, Modifier.weight(1f)) { timePicker.show() }
+                        ScheduleCard("DATE", viewModel.departureDate.ifBlank { "Select Date" }, Icons.Default.CalendarToday, PurpleAccent, Modifier.weight(1f)) { datePicker.show() }
                     }
 
-                    Spacer(Modifier.height(20.dp))
-
-                    // Seats
                     PRSectionLabel("AVAILABLE SEATS")
-                    Spacer(Modifier.height(10.dp))
                     SeatsSelector(
-                        count     = seatsCount,
-                        onDecrease = { if (seatsCount > 1) seatsCount-- },
-                        onIncrease = { if (seatsCount < 8) seatsCount++ }
+                        count = viewModel.seatsCount,
+                        onMinus = { viewModel.decrementSeats() },
+                        onPlus = { viewModel.incrementSeats() }
                     )
 
-                    Spacer(Modifier.height(20.dp))
-
-                    // Ride type
                     PRSectionLabel("RIDE TYPE")
-                    Spacer(Modifier.height(10.dp))
-                    Row(
-                        modifier              = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        PRRideTypeCard(
-                            title      = "Free",
-                            subtitle   = "Offer a free ride",
-                            icon       = Icons.Default.Favorite,
-                            isSelected = !isPaidRide,
-                            modifier   = Modifier.weight(1f),
-                            onClick    = { isPaidRide = false }
-                        )
-                        PRRideTypeCard(
-                            title      = "Paid",
-                            subtitle   = "Request a fare",
-                            icon       = Icons.Default.AccountBalanceWallet,
-                            isSelected = isPaidRide,
-                            modifier   = Modifier.weight(1f),
-                            onClick    = { isPaidRide = true }
-                        )
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        PRRideTypeCard("Free", "Offer free ride", Icons.Default.Favorite, !viewModel.isPaidRide, MintPrimary, Modifier.weight(1f)) { viewModel.setPaid(false) }
+                        PRRideTypeCard("Paid", "Charge a fare", Icons.Default.Payments, viewModel.isPaidRide, RedPrimary, Modifier.weight(1f)) { viewModel.setPaid(true) }
                     }
 
-                    Spacer(Modifier.height(20.dp))
-
-                    // Trust banner
                     PRTrustBanner()
 
-                    Spacer(Modifier.height(20.dp))
-
-                    // CTA
                     Button(
-                        onClick        = { postRide() },
-                        enabled        = !isLoading,
-                        modifier       = Modifier.fillMaxWidth().height(54.dp),
-                        shape          = RoundedCornerShape(16.dp),
-                        colors         = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
-                        contentPadding = PaddingValues(0.dp)
+                        onClick = { viewModel.postRide() },
+                        enabled = !viewModel.isLoading,
+                        modifier = Modifier.fillMaxWidth().height(58.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent)
                     ) {
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .background(
-                                    Brush.linearGradient(
-                                        listOf(GreenMid, GreenBright, GreenLight),
-                                        start = Offset(0f, 0f),
-                                        end   = Offset(Float.POSITIVE_INFINITY, 0f)
-                                    ),
-                                    shape = RoundedCornerShape(16.dp)
+                                    Brush.horizontalGradient(listOf(CyanPrimary, PurpleAccent)),
+                                    RoundedCornerShape(16.dp)
                                 ),
                             contentAlignment = Alignment.Center
                         ) {
-                            if (isLoading) {
-                                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp), strokeWidth = 2.5.dp)
+                            if (viewModel.isLoading) {
+                                CircularProgressIndicator(color = TextHero, modifier = Modifier.size(26.dp))
                             } else {
-                                Row(
-                                    verticalAlignment     = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Icon(Icons.Default.DirectionsCar, null, tint = Color.White, modifier = Modifier.size(20.dp))
-                                    Text(if (isEditing) "Update Ride" else "Post Ride", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    Icon(Icons.Default.DirectionsCar, null, tint = TextHero, modifier = Modifier.size(22.dp))
+                                    Text(
+                                        if (viewModel.isEditing) "Update Ride" else "Post Ride Now",
+                                        fontSize = 17.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = TextHero
+                                    )
                                 }
                             }
                         }
@@ -383,325 +234,207 @@ fun PostRideScreen(navController: NavController, rideId: String? = null) {
                 }
             }
 
-            if (isLoading) LoadingState()
-            // Error dialog
-            errorMessage?.let { msg ->
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.3f))
-                        .clickable { errorMessage = null },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Surface(
-                        modifier  = Modifier.padding(32.dp),
-                        shape     = RoundedCornerShape(20.dp),
-                        color     = CardWhite,
-                        tonalElevation = 8.dp
-                    ) {
-                        Column(
-                            modifier            = Modifier.padding(24.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Icon(Icons.Default.ErrorOutline, null, tint = Color(0xFFE24B4A), modifier = Modifier.size(48.dp))
-                            Spacer(Modifier.height(12.dp))
-                            Text(msg, textAlign = TextAlign.Center, fontWeight = FontWeight.Medium, fontSize = 14.sp, color = TextPrimary)
-                            Spacer(Modifier.height(20.dp))
-                            Button(
-                                onClick = { errorMessage = null },
-                                shape   = RoundedCornerShape(12.dp),
-                                colors  = ButtonDefaults.buttonColors(containerColor = GreenMid)
-                            ) { Text("Dismiss", color = Color.White, fontWeight = FontWeight.Bold) }
-                        }
-                    }
-                }
-            }
+            if (viewModel.isLoading) LoadingState()
+            viewModel.errorMessage?.let { ErrorState(message = it, onDismiss = { viewModel.errorMessage = null }) }
         }
     }
 }
 
-// ---------------------------------------------------------------------------
-// Hero
-// ---------------------------------------------------------------------------
 @Composable
-private fun PostRideHero() {
-    Box(
+fun PostRideHero() {
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .background(
-                Brush.linearGradient(
-                    listOf(GreenDeep, GreenMid, GreenBright),
-                    start = Offset(0f, 0f),
-                    end   = Offset(500f, 400f)
-                )
+                Brush.verticalGradient(listOf(Crater, Abyss))
             )
-            .drawBehind {
-                val dot  = Color.White.copy(alpha = 0.06f)
-                val step = 16f
-                var x = 0f
-                while (x < size.width) {
-                    var y = 0f
-                    while (y < size.height) { drawCircle(dot, 1f, Offset(x, y)); y += step }
-                    x += step
-                }
-            }
+            .padding(horizontal = 24.dp, vertical = 32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Blobs
-        Box(modifier = Modifier.size(160.dp).offset(x = 240.dp, y = (-30).dp).clip(CircleShape).background(Brush.radialGradient(listOf(GreenLight.copy(alpha = 0.28f), Color.Transparent))))
-        Box(modifier = Modifier.size(90.dp).offset(x = (-20).dp, y = 60.dp).clip(CircleShape).background(Brush.radialGradient(listOf(GreenBright.copy(alpha = 0.22f), Color.Transparent))))
-
-        Column(
-            modifier            = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 28.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+        Box(
+            modifier = Modifier
+                .size(64.dp)
+                .background(CyanGlow, CircleShape)
+                .border(2.dp, CyanPrimary, CircleShape),
+            contentAlignment = Alignment.Center
         ) {
-            // Icon ring
-            Box(
-                modifier = Modifier
-                    .size(76.dp)
-                    .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.14f))
-                    .border(2.dp, Color.White.copy(alpha = 0.3f), CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Default.DirectionsCar, null, tint = Color.White, modifier = Modifier.size(38.dp))
-            }
-            Spacer(Modifier.height(16.dp))
-            Text("Share a ride. Build community. ❤️", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White, textAlign = TextAlign.Center, lineHeight = 24.sp)
-            Spacer(Modifier.height(8.dp))
-            Text("Help someone reach their destination and make our community stronger.", fontSize = 13.sp, color = Color.White.copy(alpha = 0.65f), textAlign = TextAlign.Center, lineHeight = 18.sp)
+            Icon(Icons.Default.ElectricCar, null, tint = CyanPrimary, modifier = Modifier.size(32.dp))
         }
-    }
-    // Wave
-    Canvas(modifier = Modifier.fillMaxWidth().height(24.dp)) {
-        val w = size.width; val h = size.height
-        drawRect(color = GreenBright, size = androidx.compose.ui.geometry.Size(w, h * .5f))
-        val path = Path().apply {
-            moveTo(0f, 0f)
-            cubicTo(w * .3f, h * 1.8f, w * .7f, -h * .8f, w, h * .5f)
-            lineTo(w, 0f); close()
-        }
-        drawPath(path, PageBg)
-        drawRect(PageBg, Offset(0f, h * .5f), androidx.compose.ui.geometry.Size(w, h * .5f))
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Route field
-// ---------------------------------------------------------------------------
-@Composable
-private fun RouteField(
-    value: String,
-    onValueChange: (String) -> Unit,
-    placeholder: String,
-    leadIcon: ImageVector,
-    onTrailingClick: (() -> Unit)? = null
-) {
-    Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), color = CardWhite, border = BorderStroke(1.5.dp, GreenPale)) {
-        OutlinedTextField(
-            value         = value,
-            onValueChange = onValueChange,
-            placeholder   = { Text(placeholder, color = Color(0xFFAAC4AA), fontSize = 14.sp) },
-            leadingIcon   = { Icon(leadIcon, null, tint = GreenBright, modifier = Modifier.size(20.dp)) },
-            trailingIcon  = {
-                if (onTrailingClick != null) {
-                    IconButton(onClick = onTrailingClick) {
-                        Icon(Icons.Default.MyLocation, null, tint = GreenHint, modifier = Modifier.size(18.dp))
-                    }
-                } else {
-                    Icon(Icons.Default.MyLocation, null, tint = Color.Transparent, modifier = Modifier.size(18.dp))
-                }
-            },
-            singleLine    = true,
-            modifier      = Modifier.fillMaxWidth(),
-            colors        = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor   = Color.Transparent,
-                unfocusedBorderColor = Color.Transparent,
-                focusedTextColor     = GreenDeep,
-                unfocusedTextColor   = GreenDeep,
-                cursorColor          = GreenBright
-            ),
-            textStyle = LocalTextStyle.current.copy(fontSize = 14.sp)
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            "Share the Journey",
+            fontSize = 24.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = TextHero,
+            textAlign = TextAlign.Center
+        )
+        Text(
+            "Reduce carbon footprint and meet new people",
+            fontSize = 14.sp,
+            color = TextSecondary,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = 8.dp)
         )
     }
 }
 
-// ---------------------------------------------------------------------------
-// Schedule card (time / date)
-// ---------------------------------------------------------------------------
 @Composable
-private fun ScheduleCard(
+fun PRSectionLabel(label: String) {
+    Text(
+        label,
+        fontSize = 12.sp,
+        fontWeight = FontWeight.Bold,
+        color = CyanPrimary,
+        letterSpacing = 1.5.sp,
+        modifier = Modifier.padding(bottom = 4.dp)
+    )
+}
+
+@Composable
+fun RouteField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    leadIcon: ImageVector,
+    accentColor: Color,
+    onTrailingClick: (() -> Unit)? = null
+) {
+    TextField(
+        value = value,
+        onValueChange = onValueChange,
+        placeholder = { Text(placeholder, color = TextMuted) },
+        leadingIcon = { Icon(leadIcon, null, tint = accentColor) },
+        trailingIcon = onTrailingClick?.let {
+            {
+                IconButton(onClick = it) {
+                    Icon(Icons.Default.MyLocation, null, tint = TextSecondary)
+                }
+            }
+        },
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, GlassEdge, RoundedCornerShape(12.dp)),
+        colors = TextFieldDefaults.colors(
+            focusedContainerColor = Cavern,
+            unfocusedContainerColor = Cavern,
+            focusedIndicatorColor = Color.Transparent,
+            unfocusedIndicatorColor = Color.Transparent,
+            focusedTextColor = TextPrimary,
+            unfocusedTextColor = TextPrimary
+        ),
+        shape = RoundedCornerShape(12.dp),
+        singleLine = true
+    )
+}
+
+@Composable
+fun ScheduleCard(
     label: String,
     value: String,
     icon: ImageVector,
-    isFilled: Boolean,
-    modifier: Modifier,
+    color: Color,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    Surface(
-        modifier  = modifier,
-        onClick   = onClick,
-        shape     = RoundedCornerShape(14.dp),
-        color     = CardWhite,
-        border    = BorderStroke(1.5.dp, if (isFilled) GreenBright else GreenPale)
+    Column(
+        modifier = modifier
+            .background(Cavern, RoundedCornerShape(12.dp))
+            .border(1.dp, GlassEdge, RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Text(label, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = GreenHint, letterSpacing = 0.5.sp)
-            Spacer(Modifier.height(6.dp))
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Icon(icon, null, tint = if (isFilled) GreenBright else GreenHint, modifier = Modifier.size(16.dp))
-                Text(value, fontSize = 13.sp, color = if (isFilled) GreenDeep else Color(0xFFAAC4AA), fontWeight = if (isFilled) FontWeight.SemiBold else FontWeight.Normal)
-            }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Icon(icon, null, tint = color, modifier = Modifier.size(14.dp))
+            Text(label, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TextSecondary)
         }
+        Text(value, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = TextHero)
     }
 }
 
-// ---------------------------------------------------------------------------
-// Seats selector
-// ---------------------------------------------------------------------------
 @Composable
-private fun SeatsSelector(count: Int, onDecrease: () -> Unit, onIncrease: () -> Unit) {
-    Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), color = CardWhite, border = BorderStroke(1.5.dp, GreenPale)) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                // Minus
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(if (count > 1) GreenSurface else PageBg)
-                        .border(1.dp, if (count > 1) GreenPale else Color.Transparent, RoundedCornerShape(12.dp))
-                        .clickable(enabled = count > 1) { onDecrease() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Default.Remove, null, tint = if (count > 1) GreenMid else Color.LightGray, modifier = Modifier.size(20.dp))
-                }
-
-                Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(count.toString(), fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = GreenDeep)
-                    Text("seats", fontSize = 10.sp, color = GreenHint, fontWeight = FontWeight.Bold)
-                }
-
-                // Plus
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(if (count < 8) GreenSurface else PageBg)
-                        .border(1.dp, if (count < 8) GreenPale else Color.Transparent, RoundedCornerShape(12.dp))
-                        .clickable(enabled = count < 8) { onIncrease() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Default.Add, null, tint = if (count < 8) GreenMid else Color.LightGray, modifier = Modifier.size(20.dp))
-                }
-            }
-
-            Spacer(Modifier.height(16.dp))
-
-            // Seat indicators
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                repeat(8) { idx ->
-                    val isSelected = idx < count
-                    Box(
-                        modifier = Modifier
-                            .size(32.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(if (isSelected) GreenMid else PageBg)
-                            .border(1.dp, if (isSelected) GreenBright else GreenPale, RoundedCornerShape(8.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            Icons.Default.AirlineSeatReclineNormal,
-                            null,
-                            tint = if (isSelected) Color.White else GreenPale,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Ride type card
-// ---------------------------------------------------------------------------
-@Composable
-fun PRRideTypeCard(
-    title: String,
-    subtitle: String,
-    icon: ImageVector,
-    isSelected: Boolean,
-    modifier: Modifier,
-    onClick: () -> Unit
+fun SeatsSelector(
+    count: Int,
+    onMinus: () -> Unit,
+    onPlus: () -> Unit
 ) {
-    Surface(
-        modifier = modifier,
-        onClick  = onClick,
-        shape    = RoundedCornerShape(14.dp),
-        color    = if (isSelected) GreenSurface else CardWhite,
-        border   = BorderStroke(if (isSelected) 2.dp else 1.dp, if (isSelected) GreenBright else GreenPale)
-    ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            Box(
-                modifier = Modifier
-                    .size(38.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(if (isSelected) GreenBright.copy(alpha = 0.18f) else PageBg),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(icon, null, tint = if (isSelected) GreenMid else GreenHint, modifier = Modifier.size(20.dp))
-            }
-            Spacer(Modifier.height(8.dp))
-            Text(title, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = if (isSelected) GreenDeep else TextPrimary)
-            Text(subtitle, fontSize = 11.sp, color = GreenHint)
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Trust banner
-// ---------------------------------------------------------------------------
-@Composable
-private fun PRTrustBanner() {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(GreenSurface)
-            .border(0.5.dp, GreenSubBorder, RoundedCornerShape(14.dp))
-            .padding(12.dp),
-        verticalAlignment = Alignment.Top
+            .background(Cavern, RoundedCornerShape(12.dp))
+            .border(1.dp, GlassEdge, RoundedCornerShape(12.dp))
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Box(
-            modifier         = Modifier.size(32.dp).clip(CircleShape).background(GreenMid),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(Icons.Default.CheckCircle, null, tint = Color.White, modifier = Modifier.size(16.dp))
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Box(
+                modifier = Modifier.size(40.dp).background(CyanGlow, RoundedCornerShape(8.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Default.Groups, null, tint = CyanPrimary, modifier = Modifier.size(20.dp))
+            }
+            Text("Available Seats", color = TextPrimary, fontWeight = FontWeight.Medium)
         }
-        Spacer(Modifier.width(10.dp))
-        Text("Community Ride is built on trust and kindness. Be respectful and keep everyone safe.", fontSize = 12.sp, color = Color(0xFF27500A), lineHeight = 18.sp)
+
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+            IconButton(onClick = onMinus, modifier = Modifier.size(32.dp).border(1.dp, GlassEdgeMid, CircleShape)) {
+                Icon(Icons.Default.Remove, null, tint = TextPrimary, modifier = Modifier.size(16.dp))
+            }
+            Text(count.toString(), fontSize = 18.sp, fontWeight = FontWeight.Bold, color = CyanPrimary)
+            IconButton(onClick = onPlus, modifier = Modifier.size(32.dp).border(1.dp, CyanPrimary.copy(alpha = 0.4f), CircleShape)) {
+                Icon(Icons.Default.Add, null, tint = CyanPrimary, modifier = Modifier.size(16.dp))
+            }
+        }
     }
 }
 
-// ---------------------------------------------------------------------------
-// Section label
-// ---------------------------------------------------------------------------
 @Composable
-private fun PRSectionLabel(text: String) {
-    Text(text, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = GreenHint, letterSpacing = 1.sp)
+fun PRRideTypeCard(
+    title: String,
+    desc: String,
+    icon: ImageVector,
+    selected: Boolean,
+    color: Color,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    val bg = if (selected) color.copy(alpha = 0.12f) else Cavern
+    val border = if (selected) color.copy(alpha = 0.6f) else GlassEdge
+
+    Column(
+        modifier = modifier
+            .background(bg, RoundedCornerShape(14.dp))
+            .border(1.dp, border, RoundedCornerShape(14.dp))
+            .clickable(onClick = onClick)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Icon(icon, null, tint = if (selected) color else TextSecondary, modifier = Modifier.size(20.dp))
+        Column {
+            Text(title, fontWeight = FontWeight.Bold, color = if (selected) TextHero else TextPrimary)
+            Text(desc, fontSize = 10.sp, color = TextSecondary)
+        }
+    }
 }
 
-// ---------------------------------------------------------------------------
-// Preview
-// ---------------------------------------------------------------------------
-@Preview(showBackground = true, showSystemUi = true)
 @Composable
-fun PreviewPostRideScreenV2() {
-    MaterialTheme { PostRideScreen(navController = rememberNavController()) }
+fun PRTrustBanner() {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(GoldAccent.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
+            .border(1.dp, GoldAccent.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Icon(Icons.Default.Verified, null, tint = GoldAccent, modifier = Modifier.size(18.dp))
+        Text(
+            "Your profile is verified. Riders see your trust score and history.",
+            fontSize = 11.sp,
+            color = TextSecondary,
+            modifier = Modifier.weight(1f)
+        )
+    }
 }

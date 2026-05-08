@@ -26,12 +26,23 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.rom.poa_firstapp.data.model.Ride
 import com.rom.poa_firstapp.data.remote.SupabaseModule
 import com.rom.poa_firstapp.data.repository.RideRepositoryImpl
 import com.rom.poa_firstapp.ui.navigation.ROUTES
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+
+class FindRideViewModelFactory(private val repository: com.rom.poa_firstapp.data.repository.RideRepository) : ViewModelProvider.Factory {
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(FindRideViewModel::class.java)) {
+            @Suppress("UNCHECKED_CAST")
+            return FindRideViewModel(repository) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class")
+    }
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Design Tokens (same as RideDetailsScreen)
@@ -84,30 +95,13 @@ private val filterOptions = listOf(
 // ─────────────────────────────────────────────────────────────────────────────
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FindRideScreen(navController: NavController) {
-    var searchQuery     by remember { mutableStateOf("") }
-    var selectedFilter  by remember { mutableStateOf("All") }
-    var allRides        by remember { mutableStateOf<List<Ride>>(emptyList()) }
-    var isLoading       by remember { mutableStateOf(false) }
-    val rideRepository  = remember { RideRepositoryImpl(SupabaseModule.client) }
-
-    // Debounced search / load
-    LaunchedEffect(searchQuery) {
-        if (searchQuery.length >= 2) {
-            delay(500)
-            isLoading = true
-            allRides  = rideRepository.searchRides(searchQuery)
-            isLoading = false
-        } else if (searchQuery.isEmpty()) {
-            isLoading = true
-            allRides  = rideRepository.getAllRides()
-            isLoading = false
-        }
-    }
-
-    // Client-side filter
-    val rides = if (selectedFilter == "All") allRides
-    else allRides.filter { it.status.equals(selectedFilter, ignoreCase = true) }
+fun FindRideScreen(navController: NavController, viewModel: FindRideViewModel = viewModel(
+    factory = FindRideViewModelFactory(RideRepositoryImpl(SupabaseModule.client))
+)) {
+    val searchQuery     = viewModel.searchQuery
+    val selectedFilter  = viewModel.selectedFilter
+    val isLoading       = viewModel.isLoading
+    val rides           = viewModel.filteredRides
 
     Scaffold(
         topBar = {
@@ -142,8 +136,8 @@ fun FindRideScreen(navController: NavController) {
             // ── Search bar ────────────────────────────────────────────
             SearchBar(
                 query    = searchQuery,
-                onChange = { searchQuery = it },
-                onClear  = { searchQuery = "" }
+                onChange = { viewModel.onSearchQueryChange(it) },
+                onClear  = { viewModel.onSearchQueryChange("") }
             )
 
             // ── Filter chips ──────────────────────────────────────────
@@ -156,7 +150,7 @@ fun FindRideScreen(navController: NavController) {
                     FilterChip(
                         option     = opt,
                         isSelected = selectedFilter == opt.label,
-                        onClick    = { selectedFilter = opt.label }
+                        onClick    = { viewModel.onFilterChange(opt.label) }
                     )
                 }
             }

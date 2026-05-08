@@ -7,10 +7,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -29,11 +26,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.foundation.Canvas
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.graphics.*
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -44,7 +38,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavController
 import coil3.compose.rememberAsyncImagePainter
 import com.rom.poa_firstapp.R
 import com.rom.poa_firstapp.data.model.RiderProfile
@@ -55,23 +48,33 @@ import com.rom.poa_firstapp.ui.common.LoadingState
 import io.github.jan.supabase.auth.auth
 import java.util.Locale
 
-// ---------------------------------------------------------------------------
-// Colour palette
-// ---------------------------------------------------------------------------
-private val GreenDeep    = Color(0xFF1A3A2A)
-private val GreenMid     = Color(0xFF2D6A4F)
-private val GreenBright  = Color(0xFF40916C)
-private val GreenLight   = Color(0xFF52B788)
-private val GreenPale    = Color(0xFFD4E8D4)
-private val GreenHint    = Color(0xFF74916C)
-private val GreenSubtle  = Color(0xFFE8F5E9)
-private val PageBg       = Color(0xFFF4F6F3)
-private val CardWhite    = Color(0xFFFFFFFF)
-private val WhatsApp     = Color(0xFF25D366)
+// ─────────────────────────────────────────────────────────────────────────────
+// Design Tokens
+// ─────────────────────────────────────────────────────────────────────────────
+private val Abyss        = Color(0xFF080C1C)
+private val Cavern       = Color(0xFF0E1325)
+private val Crater       = Color(0xFF141929)
+private val GlassEdge    = Color(0x18FFFFFF)
+private val GlassEdgeMid = Color(0x30FFFFFF)
 
-// ---------------------------------------------------------------------------
+private val CyanPrimary  = Color(0xFF00E5FF)
+private val CyanGlow     = Color(0x4400E5FF)
+private val CoralPrimary = Color(0xFFFF4D7D)
+private val MintPrimary  = Color(0xFF00FFA3)
+private val GoldAccent   = Color(0xFFFFBB00)
+private val RedPrimary   = Color(0xFFFF3B47)
+private val PurpleAccent = Color(0xFFAA55FF)
+
+private val TextHero      = Color(0xFFFFFFFF)
+private val TextPrimary   = Color(0xFFE8EEFF)
+private val TextSecondary = Color(0xFF8896B8)
+private val TextMuted     = Color(0xFF4A5568)
+
+private val WhatsApp = Color(0xFF25D366)
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Screen
-// ---------------------------------------------------------------------------
+// ─────────────────────────────────────────────────────────────────────────────
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RiderProfileScreen(
@@ -85,10 +88,10 @@ fun RiderProfileScreen(
         )
     }
 ) {
-    val context = LocalContext.current
+    val context        = LocalContext.current
     val currentProfile = viewModel.profile
-    var isEditing by remember { mutableStateOf(false) }
-    val isOwnProfile = profileId == null ||
+    var isEditing      by remember { mutableStateOf(false) }
+    val isOwnProfile   = profileId == null ||
             profileId == SupabaseModule.client.auth.currentUserOrNull()?.id
 
     LaunchedEffect(profileId) { viewModel.loadProfile(profileId) }
@@ -97,15 +100,13 @@ fun RiderProfileScreen(
     Scaffold(
         topBar = {
             ProfileTopAppBar(
-                onBack       = { onBack() },
-                isOwnProfile = isOwnProfile,
-                onEditClick  = { isEditing = !isEditing },
-                onLogoutClick = {
-                    viewModel.logout { onLogout() }
-                }
+                onBack        = onBack,
+                isOwnProfile  = isOwnProfile,
+                onEditClick   = { isEditing = !isEditing },
+                onLogoutClick = { viewModel.logout { onLogout() } }
             )
         },
-        containerColor = PageBg,
+        containerColor = Abyss,
         bottomBar = {
             if (currentProfile != null && profileId != null && !isOwnProfile) {
                 MessageRiderButton(
@@ -123,20 +124,16 @@ fun RiderProfileScreen(
                         .fillMaxSize()
                         .verticalScroll(rememberScrollState())
                 ) {
-                    // Hero header (gradient)
                     ProfileHero(
                         profile         = currentProfile,
                         isEditing       = isEditing,
                         onProfileUpdate = { viewModel.updateProfile(it) },
-                        onAvatarUpload  = { bytes ->
-                            viewModel.uploadAvatar(currentProfile.id, bytes)
-                        }
+                        onAvatarUpload  = { bytes -> viewModel.uploadAvatar(currentProfile.id, bytes) }
                     )
-                    // Body sections
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(PageBg)
+                            .background(Abyss)
                             .padding(horizontal = 16.dp)
                             .padding(top = 20.dp, bottom = 32.dp),
                         verticalArrangement = Arrangement.spacedBy(20.dp)
@@ -153,9 +150,9 @@ fun RiderProfileScreen(
     }
 }
 
-// ---------------------------------------------------------------------------
-// Top app bar
-// ---------------------------------------------------------------------------
+// ─────────────────────────────────────────────────────────────────────────────
+// Top App Bar
+// ─────────────────────────────────────────────────────────────────────────────
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileTopAppBar(
@@ -168,58 +165,77 @@ fun ProfileTopAppBar(
 
     TopAppBar(
         title = {
-            Text(
-                "User Profile",
-                fontWeight = FontWeight.Bold,
-                color      = Color.White,
-                fontSize   = 17.sp
-            )
+            Text("User Profile", fontWeight = FontWeight.Bold, color = TextPrimary, fontSize = 17.sp)
         },
         navigationIcon = {
             IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
+                Box(
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(GlassEdge)
+                        .border(1.dp, GlassEdge, RoundedCornerShape(10.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = TextPrimary, modifier = Modifier.size(18.dp))
+                }
             }
         },
         actions = {
             if (isOwnProfile) {
                 IconButton(onClick = onEditClick) {
-                    Icon(Icons.Default.Edit, contentDescription = "Edit", tint = Color.White)
+                    Box(
+                        modifier = Modifier
+                            .size(34.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(GlassEdge)
+                            .border(1.dp, GlassEdge, RoundedCornerShape(10.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Edit, contentDescription = "Edit", tint = TextPrimary, modifier = Modifier.size(17.dp))
+                    }
                 }
             }
             Box {
                 IconButton(onClick = { showMenu = true }) {
-                    Icon(Icons.Default.MoreVert, contentDescription = "More", tint = Color.White)
+                    Box(
+                        modifier = Modifier
+                            .size(34.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(GlassEdge)
+                            .border(1.dp, GlassEdge, RoundedCornerShape(10.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.MoreVert, contentDescription = "More", tint = TextPrimary, modifier = Modifier.size(17.dp))
+                    }
                 }
                 DropdownMenu(
-                    expanded = showMenu,
-                    onDismissRequest = { showMenu = false }
+                    expanded         = showMenu,
+                    onDismissRequest = { showMenu = false },
+                    modifier         = Modifier.background(Cavern)
                 ) {
                     if (isOwnProfile) {
                         DropdownMenuItem(
-                            text = { Text("Logout") },
-                            onClick = {
-                                showMenu = false
-                                onLogoutClick()
-                            },
-                            leadingIcon = {
-                                Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = null)
-                            }
+                            text          = { Text("Logout", color = CoralPrimary, fontSize = 14.sp) },
+                            onClick       = { showMenu = false; onLogoutClick() },
+                            leadingIcon   = { Icon(Icons.AutoMirrored.Filled.ExitToApp, null, tint = CoralPrimary, modifier = Modifier.size(18.dp)) }
                         )
                     }
                     DropdownMenuItem(
-                        text = { Text("Share Profile") },
-                        onClick = { showMenu = false }
+                        text        = { Text("Share Profile", color = TextPrimary, fontSize = 14.sp) },
+                        onClick     = { showMenu = false },
+                        leadingIcon = { Icon(Icons.Default.Share, null, tint = CyanPrimary, modifier = Modifier.size(18.dp)) }
                     )
                 }
             }
         },
-        colors = TopAppBarDefaults.topAppBarColors(containerColor = GreenDeep)
+        colors = TopAppBarDefaults.topAppBarColors(containerColor = Cavern)
     )
 }
 
-// ---------------------------------------------------------------------------
-// Hero header — gradient with avatar, name, bio
-// ---------------------------------------------------------------------------
+// ─────────────────────────────────────────────────────────────────────────────
+// Hero
+// ─────────────────────────────────────────────────────────────────────────────
 @Composable
 fun ProfileHero(
     profile: RiderProfile,
@@ -228,62 +244,53 @@ fun ProfileHero(
     onAvatarUpload: (ByteArray) -> Unit
 ) {
     val context     = LocalContext.current
-    var fullName    by remember(profile.full_name)   { mutableStateOf(profile.full_name) }
-    var bio         by remember(profile.bio)         { mutableStateOf(profile.bio ?: "") }
-    var phoneNumber by remember(profile.phone_number){ mutableStateOf(profile.phone_number ?: "") }
+    var fullName    by remember(profile.full_name)    { mutableStateOf(profile.full_name) }
+    var bio         by remember(profile.bio)          { mutableStateOf(profile.bio ?: "") }
+    var phoneNumber by remember(profile.phone_number) { mutableStateOf(profile.phone_number ?: "") }
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .background(
                 Brush.linearGradient(
-                    colors = listOf(GreenDeep, GreenMid, GreenBright),
+                    colors = listOf(Abyss, Cavern, Crater),
                     start  = Offset(0f, 0f),
                     end    = Offset(600f, 600f)
                 )
             )
-            .drawBehind { drawDotGrid(this) }
+            .drawBehind {
+                // dot grid
+                val dot  = Color.White.copy(alpha = 0.04f)
+                val step = 16f
+                var x = 0f
+                while (x < size.width) {
+                    var y = 0f
+                    while (y < size.height) { drawCircle(dot, 1f, Offset(x, y)); y += step }
+                    x += step
+                }
+            }
     ) {
-        // Decorative blobs
-        Box(
-            modifier = Modifier
-                .size(160.dp)
-                .offset(x = 240.dp, y = (-20).dp)
-                .clip(CircleShape)
-                .background(GreenLight.copy(alpha = 0.18f))
-        )
-        Box(
-            modifier = Modifier
-                .size(90.dp)
-                .offset(x = 180.dp, y = 80.dp)
-                .clip(CircleShape)
-                .background(GreenLight.copy(alpha = 0.12f))
-        )
+        // Ambient glows
+        Box(modifier = Modifier.size(200.dp).offset(x = 220.dp, y = (-40).dp).clip(CircleShape).background(Brush.radialGradient(listOf(CyanPrimary.copy(alpha = 0.12f), Color.Transparent))))
+        Box(modifier = Modifier.size(140.dp).offset(x = (-30).dp, y = 60.dp).clip(CircleShape).background(Brush.radialGradient(listOf(PurpleAccent.copy(alpha = 0.10f), Color.Transparent))))
+        Box(modifier = Modifier.size(90.dp).offset(x = 180.dp, y = 80.dp).clip(CircleShape).background(Brush.radialGradient(listOf(MintPrimary.copy(alpha = 0.08f), Color.Transparent))))
 
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp)
+            modifier = Modifier.fillMaxWidth().padding(20.dp)
         ) {
             // Avatar + name row
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Row(
+                verticalAlignment     = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
                 // Avatar
-                val painter = rememberAsyncImagePainter(
-                    model    = profile.avatar_url,
-                    error    = painterResource(R.drawable.ic_profile),
-                    fallback = painterResource(R.drawable.ic_profile)
-                )
-                val launcher = rememberLauncherForActivityResult(
-                    contract = ActivityResultContracts.PickVisualMedia()
-                ) { uri ->
+                val launcher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
                     uri?.let {
-                        context.contentResolver.openInputStream(it)?.use { inputStream ->
-                            val bytes = inputStream.readBytes()
-                            onAvatarUpload(bytes)
+                        context.contentResolver.openInputStream(it)?.use { stream ->
+                            onAvatarUpload(stream.readBytes())
                         }
                     }
                 }
-
                 Box(
                     modifier = Modifier
                         .size(76.dp)
@@ -291,24 +298,27 @@ fun ProfileHero(
                             launcher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                         }
                 ) {
-                    Image(
+                    val painter = rememberAsyncImagePainter(
+                        model    = profile.avatar_url,
+                        error    = painterResource(R.drawable.ic_profile),
+                        fallback = painterResource(R.drawable.ic_profile)
+                    )
+                    androidx.compose.foundation.Image(
                         painter            = painter,
-                        contentDescription = "Profile Picture",
+                        contentDescription = "Avatar",
                         contentScale       = ContentScale.Crop,
                         modifier           = Modifier
                             .fillMaxSize()
                             .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.15f))
-                            .border(2.5.dp, Color.White.copy(alpha = 0.35f), CircleShape)
+                            .background(Crater)
+                            .border(2.5.dp, CyanPrimary.copy(alpha = 0.28f), CircleShape)
                     )
                     if (isEditing) {
                         Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(Color.Black.copy(alpha = 0.3f), CircleShape),
+                            modifier         = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.4f), CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(Icons.Default.CameraAlt, contentDescription = "Change Photo", tint = Color.White, modifier = Modifier.size(20.dp))
+                            Icon(Icons.Default.CameraAlt, null, tint = Color.White, modifier = Modifier.size(20.dp))
                         }
                     }
                 }
@@ -318,408 +328,283 @@ fun ProfileHero(
                         OutlinedTextField(
                             value         = fullName,
                             onValueChange = { fullName = it },
-                            label         = { Text("Full Name", color = GreenLight, fontSize = 12.sp) },
+                            label         = { Text("Full Name", color = CyanPrimary, fontSize = 12.sp) },
                             singleLine    = true,
                             modifier      = Modifier.fillMaxWidth(),
-                            colors        = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor   = GreenLight,
-                                unfocusedBorderColor = GreenLight.copy(alpha = 0.5f),
-                                focusedTextColor     = Color.White,
-                                unfocusedTextColor   = Color.White,
-                                cursorColor          = GreenLight
-                            )
+                            colors        = darkFieldColors()
                         )
                     } else {
-                        Text(
-                            text       = profile.full_name,
-                            fontSize   = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            color      = Color.White
-                        )
+                        Text(profile.full_name, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = TextHero)
                     }
                     // Verified pill
                     Row(
-                        modifier          = Modifier
-                            .background(GreenLight.copy(alpha = 0.22f), RoundedCornerShape(20.dp))
-                            .border(1.dp, GreenLight.copy(alpha = 0.4f), RoundedCornerShape(20.dp))
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(CyanPrimary.copy(alpha = 0.12f))
+                            .border(1.dp, CyanPrimary.copy(alpha = 0.28f), RoundedCornerShape(20.dp))
                             .padding(horizontal = 10.dp, vertical = 3.dp),
-                        verticalAlignment = Alignment.CenterVertically,
+                        verticalAlignment     = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = GreenLight, modifier = Modifier.size(13.dp))
-                        Text("Verified", fontSize = 12.sp, color = GreenLight, fontWeight = FontWeight.Medium)
+                        Icon(Icons.Default.CheckCircle, null, tint = CyanPrimary, modifier = Modifier.size(12.dp))
+                        Text("Verified", fontSize = 11.sp, color = CyanPrimary, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(Modifier.height(14.dp))
 
             // Bio / edit fields
             if (isEditing) {
                 OutlinedTextField(
-                    value         = phoneNumber,
-                    onValueChange = { phoneNumber = it },
-                    label         = { Text("Phone Number", color = GreenLight, fontSize = 12.sp) },
-                    modifier      = Modifier.fillMaxWidth(),
+                    value           = phoneNumber,
+                    onValueChange   = { phoneNumber = it },
+                    label           = { Text("Phone Number", color = CyanPrimary, fontSize = 12.sp) },
+                    modifier        = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                    colors        = editFieldColors()
+                    colors          = darkFieldColors()
                 )
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(Modifier.height(8.dp))
                 OutlinedTextField(
                     value         = bio,
                     onValueChange = { bio = it },
-                    label         = { Text("Bio", color = GreenLight, fontSize = 12.sp) },
+                    label         = { Text("Bio", color = CyanPrimary, fontSize = 12.sp) },
                     modifier      = Modifier.fillMaxWidth(),
-                    colors        = editFieldColors()
+                    colors        = darkFieldColors()
                 )
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(Modifier.height(10.dp))
                 Button(
                     onClick = {
                         val cleaned = phoneNumber.filter { it.isDigit() }
                         val formatted = when {
                             cleaned.startsWith("254") -> cleaned
-                            cleaned.startsWith("0") -> "254" + cleaned.substring(1)
-                            cleaned.length == 9 -> "254$cleaned"
-                            else -> cleaned
+                            cleaned.startsWith("0")   -> "254" + cleaned.substring(1)
+                            cleaned.length == 9       -> "254$cleaned"
+                            else                      -> cleaned
                         }
-                        onProfileUpdate(
-                            profile.copy(full_name = fullName, bio = bio, phone_number = formatted)
-                        )
+                        onProfileUpdate(profile.copy(full_name = fullName, bio = bio, phone_number = formatted))
                     },
                     modifier = Modifier.align(Alignment.End),
                     shape    = RoundedCornerShape(10.dp),
-                    colors   = ButtonDefaults.buttonColors(containerColor = GreenLight)
+                    colors   = ButtonDefaults.buttonColors(containerColor = CyanPrimary)
                 ) {
-                    Text("Save", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("Save", color = Abyss, fontWeight = FontWeight.Bold)
                 }
             } else {
                 Text(
-                    text    = profile.bio ?: "Community rider, always happy to help!",
-                    color   = Color.White.copy(alpha = 0.65f),
-                    fontSize = 13.sp,
+                    profile.bio ?: "Community rider, always happy to help!",
+                    color      = Color.White.copy(alpha = 0.55f),
+                    fontSize   = 13.sp,
                     lineHeight = 18.sp
                 )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-        }
-
-        // Wave bottom
-        Box(modifier = Modifier.align(Alignment.BottomCenter)) {
-            // Handled by SVG-like clipping below
+            Spacer(Modifier.height(16.dp))
         }
     }
 
-    // Wave transition into page bg
-    Canvas(modifier = Modifier.fillMaxWidth().height(28.dp)) {
-        val w = size.width
-        val h = size.height
+    // Wave
+    Canvas(modifier = Modifier.fillMaxWidth().height(22.dp)) {
+        val w = size.width; val h = size.height
+        drawRect(Crater, size = androidx.compose.ui.geometry.Size(w, h * .5f))
         val path = Path().apply {
             moveTo(0f, 0f)
-            cubicTo(w * 0.25f, h * 1.4f, w * 0.75f, -h * 0.4f, w, h * 0.5f)
-            lineTo(w, 0f)
-            close()
+            cubicTo(w * .25f, h * 2f, w * .75f, -h * 1f, w, h * .5f)
+            lineTo(w, 0f); close()
         }
-        // top strip is hero colour
-        drawRect(color = GreenBright, size = androidx.compose.ui.geometry.Size(w, h / 2))
-        // wave fill is page colour
-        drawPath(path = path, color = PageBg)
-        drawRect(color = PageBg, topLeft = Offset(0f, h / 2), size = androidx.compose.ui.geometry.Size(w, h / 2))
+        drawPath(path, Abyss)
+        drawRect(Abyss, Offset(0f, h * .5f), androidx.compose.ui.geometry.Size(w, h * .5f))
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun editFieldColors() = OutlinedTextFieldDefaults.colors(
-    focusedBorderColor   = GreenLight,
-    unfocusedBorderColor = GreenLight.copy(alpha = 0.5f),
-    focusedTextColor     = Color.White,
-    unfocusedTextColor   = Color.White,
-    cursorColor          = GreenLight
+private fun darkFieldColors() = OutlinedTextFieldDefaults.colors(
+    focusedBorderColor   = CyanPrimary,
+    unfocusedBorderColor = CyanPrimary.copy(alpha = 0.35f),
+    focusedTextColor     = TextPrimary,
+    unfocusedTextColor   = TextPrimary,
+    cursorColor          = CyanPrimary,
+    focusedContainerColor   = Cavern,
+    unfocusedContainerColor = Cavern
 )
 
-// ---------------------------------------------------------------------------
-// Stats section
-// ---------------------------------------------------------------------------
+// ─────────────────────────────────────────────────────────────────────────────
+// Stats Section
+// ─────────────────────────────────────────────────────────────────────────────
 @Composable
 fun StatsSection(profile: RiderProfile) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        SectionLabel(text = "STATS")
-        // 2-col grid for first two stats
+        RPSectionLabel("STATS")
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            StatCard(
-                modifier    = Modifier.weight(1f),
-                icon        = Icons.Default.DirectionsCar,
-                value       = profile.rides_given.toString(),
-                label       = "Rides Given",
-                description = "Going the extra mile"
-            )
-            StatCard(
-                modifier    = Modifier.weight(1f),
-                icon        = Icons.Default.Person,
-                value       = profile.rides_taken.toString(),
-                label       = "Rides Taken",
-                description = "Thanks, community!"
-            )
+            RPStatCard(modifier = Modifier.weight(1f), icon = Icons.Default.DirectionsCar, iconColor = CyanPrimary,  value = profile.rides_given.toString(),  label = "Rides Given",  description = "Going the extra mile")
+            RPStatCard(modifier = Modifier.weight(1f), icon = Icons.Default.Person,        iconColor = PurpleAccent, value = profile.rides_taken.toString(),  label = "Rides Taken",  description = "Thanks, community!")
         }
-        // Full-width rating card
-        RatingCard(
-            rating      = profile.community_rating,
-            totalReviews = profile.total_reviews
-        )
+        RPRatingCard(rating = profile.community_rating, totalReviews = profile.total_reviews)
     }
 }
 
 @Composable
-fun StatCard(
+fun RPStatCard(
     modifier: Modifier = Modifier,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
+    iconColor: Color,
     value: String,
     label: String,
     description: String
 ) {
-    Surface(
-        modifier  = modifier,
-        shape     = RoundedCornerShape(14.dp),
-        color     = CardWhite,
-        tonalElevation = 0.dp,
-        border    = ButtonDefaults.outlinedButtonBorder.copy(width = 1.dp).also { }
-            .let { androidx.compose.foundation.BorderStroke(1.dp, GreenPale) }
-    ) {
-        Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            Icon(icon, contentDescription = null, tint = GreenBright, modifier = Modifier.size(22.dp))
-            Text(value, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = GreenDeep)
-            Text(label, fontSize = 12.sp, color = GreenHint, fontWeight = FontWeight.Medium)
-            Text(description, fontSize = 11.sp, color = Color(0xFFAAC4AA))
+    Surface(modifier = modifier, shape = RoundedCornerShape(14.dp), color = Cavern, border = BorderStroke(1.dp, GlassEdge)) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Box(modifier = Modifier.size(32.dp).clip(RoundedCornerShape(9.dp)).background(iconColor.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
+                Icon(icon, null, tint = iconColor, modifier = Modifier.size(16.dp))
+            }
+            Text(value, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
+            Text(label, fontSize = 12.sp, color = TextSecondary, fontWeight = FontWeight.Medium)
+            Text(description, fontSize = 10.5.sp, color = TextMuted)
         }
     }
 }
 
 @Composable
-fun RatingCard(rating: Double, totalReviews: Int) {
-    Surface(
-        modifier  = Modifier.fillMaxWidth(),
-        shape     = RoundedCornerShape(14.dp),
-        color     = CardWhite,
-        border    = androidx.compose.foundation.BorderStroke(1.dp, GreenPale)
-    ) {
-        Row(
-            modifier          = Modifier.padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            Icon(Icons.Default.Star, contentDescription = null, tint = GreenBright, modifier = Modifier.size(26.dp))
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(
-                    String.format(Locale.US, "%.1f", rating),
-                    fontSize   = 24.sp,
-                    fontWeight = FontWeight.Bold,
-                    color      = GreenDeep
-                )
-                Text("Community Rating", fontSize = 12.sp, color = GreenHint, fontWeight = FontWeight.Medium)
-                Text("Based on $totalReviews reviews", fontSize = 11.sp, color = Color(0xFFAAC4AA))
+fun RPRatingCard(rating: Double, totalReviews: Int) {
+    Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), color = Cavern, border = BorderStroke(1.dp, GlassEdge)) {
+        Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            Box(modifier = Modifier.size(32.dp).clip(RoundedCornerShape(9.dp)).background(GoldAccent.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
+                Icon(Icons.Default.Star, null, tint = GoldAccent, modifier = Modifier.size(18.dp))
             }
-            Spacer(modifier = Modifier.weight(1f))
-            // Star row
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(String.format(Locale.US, "%.1f", rating), fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
+                Text("Community Rating", fontSize = 12.sp, color = TextSecondary, fontWeight = FontWeight.Medium)
+                Text("Based on $totalReviews reviews", fontSize = 10.5.sp, color = TextMuted)
+            }
+            Spacer(Modifier.weight(1f))
             Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                repeat(5) {
-                    Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFEF9F27), modifier = Modifier.size(16.dp))
-                }
+                repeat(5) { Icon(Icons.Default.Star, null, tint = GoldAccent, modifier = Modifier.size(15.dp)) }
             }
         }
     }
 }
 
-// ---------------------------------------------------------------------------
-// Badges section
-// ---------------------------------------------------------------------------
+// ─────────────────────────────────────────────────────────────────────────────
+// Badges Section
+// ─────────────────────────────────────────────────────────────────────────────
 @Composable
 fun BadgesSection() {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Row(
-            modifier              = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment     = Alignment.CenterVertically
-        ) {
-            SectionLabel(text = "BADGES")
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            RPSectionLabel("BADGES")
             TextButton(onClick = {}) {
-                Text("View all", color = GreenBright, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                Text("View all", color = CyanPrimary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            BadgeCard(
-                modifier     = Modifier.weight(1f),
-                icon         = Icons.Default.Shield,
-                title        = "Top Helper",
-                description  = "Helped 50+ riders"
-            )
-            BadgeCard(
-                modifier     = Modifier.weight(1f),
-                icon         = Icons.Default.Eco,
-                title        = "Eco-Friendly",
-                description  = "Reduced 100+ kg CO₂"
-            )
+            RPBadgeCard(modifier = Modifier.weight(1f), icon = Icons.Default.Shield,      iconColor = MintPrimary,  title = "Top Helper",      description = "Helped 50+ riders")
+            RPBadgeCard(modifier = Modifier.weight(1f), icon = Icons.Default.Eco,         iconColor = CyanPrimary,  title = "Eco-Friendly",    description = "Reduced 100+ kg CO₂")
         }
-        BadgeCard(
-            modifier    = Modifier.fillMaxWidth(),
-            icon        = Icons.Default.EmojiEvents,
-            title       = "Community Star",
-            description = "Rated 4.5+ by the community",
-            horizontal  = true
-        )
+        RPBadgeCard(modifier = Modifier.fillMaxWidth(), icon = Icons.Default.EmojiEvents, iconColor = GoldAccent,   title = "Community Star",  description = "Rated 4.5+ by the community", horizontal = true)
     }
 }
 
 @Composable
-fun BadgeCard(
+fun RPBadgeCard(
     modifier: Modifier = Modifier,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
+    iconColor: Color,
     title: String,
     description: String,
     horizontal: Boolean = false
 ) {
-    Surface(
-        modifier = modifier,
-        shape    = RoundedCornerShape(14.dp),
-        color    = CardWhite,
-        border   = androidx.compose.foundation.BorderStroke(1.dp, GreenPale)
-    ) {
+    Surface(modifier = modifier, shape = RoundedCornerShape(14.dp), color = Cavern, border = BorderStroke(1.dp, GlassEdge)) {
         if (horizontal) {
-            Row(
-                modifier          = Modifier.padding(14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                Box(
-                    modifier         = Modifier
-                        .size(42.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(GreenSubtle),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(icon, contentDescription = null, tint = GreenMid, modifier = Modifier.size(22.dp))
+            Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                Box(modifier = Modifier.size(42.dp).clip(RoundedCornerShape(10.dp)).background(iconColor.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
+                    Icon(icon, null, tint = iconColor, modifier = Modifier.size(22.dp))
                 }
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(title, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = GreenDeep)
-                    Text(description, fontSize = 12.sp, color = GreenHint)
+                    Text(title, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                    Text(description, fontSize = 12.sp, color = TextSecondary)
                 }
             }
         } else {
-            Column(
-                modifier = Modifier.padding(14.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Box(
-                    modifier         = Modifier
-                        .size(40.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(GreenSubtle),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(icon, contentDescription = null, tint = GreenMid, modifier = Modifier.size(22.dp))
+            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Box(modifier = Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)).background(iconColor.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
+                    Icon(icon, null, tint = iconColor, modifier = Modifier.size(20.dp))
                 }
-                Text(title, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = GreenDeep)
-                Text(description, fontSize = 11.sp, color = GreenHint, lineHeight = 15.sp)
+                Text(title, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                Text(description, fontSize = 11.sp, color = TextSecondary, lineHeight = 15.sp)
             }
         }
     }
 }
 
-// ---------------------------------------------------------------------------
-// Verification section
-// ---------------------------------------------------------------------------
+// ─────────────────────────────────────────────────────────────────────────────
+// Verification Section
+// ─────────────────────────────────────────────────────────────────────────────
 @Composable
 fun VerificationSection(profile: RiderProfile) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        SectionLabel(text = "VERIFICATION")
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape    = RoundedCornerShape(14.dp),
-            color    = CardWhite,
-            border   = androidx.compose.foundation.BorderStroke(1.dp, GreenPale)
-        ) {
+        RPSectionLabel("VERIFICATION")
+        Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), color = Cavern, border = BorderStroke(1.dp, GlassEdge)) {
             Column {
-                VerificationRow(
-                    icon  = Icons.Default.Person,
-                    label = "Member since",
-                    value = profile.member_since?.substringBefore("T") ?: "N/A"
-                )
-                HorizontalDivider(color = GreenPale, thickness = 0.8.dp)
-                VerificationRow(
-                    icon       = Icons.Default.Phone,
-                    label      = "Phone verified",
-                    isVerified = profile.phone_verified
-                )
-                HorizontalDivider(color = GreenPale, thickness = 0.8.dp)
-                VerificationRow(
-                    icon       = Icons.Default.Email,
-                    label      = "Email verified",
-                    isVerified = profile.email_verified
-                )
+                RPVerifRow(icon = Icons.Default.Person, label = "Member since", value = profile.member_since?.substringBefore("T") ?: "N/A")
+                HorizontalDivider(color = GlassEdge, thickness = 0.8.dp)
+                RPVerifRow(icon = Icons.Default.Phone, label = "Phone verified", isVerified = profile.phone_verified)
+                HorizontalDivider(color = GlassEdge, thickness = 0.8.dp)
+                RPVerifRow(icon = Icons.Default.Email, label = "Email verified",  isVerified = profile.email_verified)
             }
         }
     }
 }
 
 @Composable
-fun VerificationRow(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+fun RPVerifRow(
+    icon: ImageVector,
     label: String,
     value: String? = null,
     isVerified: Boolean = false
 ) {
     Row(
-        modifier              = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 14.dp),
+        modifier              = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Icon(icon, contentDescription = null, tint = GreenHint, modifier = Modifier.size(20.dp))
-            Text(label, fontSize = 14.sp, color = GreenDeep)
+            Icon(icon, null, tint = TextSecondary, modifier = Modifier.size(20.dp))
+            Text(label, fontSize = 14.sp, color = TextPrimary)
         }
         if (value != null) {
-            Text(value, fontSize = 14.sp, color = GreenHint)
+            Text(value, fontSize = 14.sp, color = TextSecondary)
         } else {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 Icon(
-                    imageVector        = if (isVerified) Icons.Default.CheckCircle else Icons.Default.Close,
-                    contentDescription = null,
-                    tint               = if (isVerified) GreenBright else Color(0xFFE24B4A),
-                    modifier           = Modifier.size(20.dp)
+                    if (isVerified) Icons.Default.CheckCircle else Icons.Default.Close,
+                    null,
+                    tint     = if (isVerified) MintPrimary else RedPrimary,
+                    modifier = Modifier.size(20.dp)
                 )
-                if (isVerified) {
-                    Text("Verified", fontSize = 13.sp, color = GreenBright, fontWeight = FontWeight.Medium)
-                }
+                if (isVerified) Text("Verified", fontSize = 12.sp, color = MintPrimary, fontWeight = FontWeight.SemiBold)
             }
         }
     }
 }
 
-// ---------------------------------------------------------------------------
-// WhatsApp message button
-// ---------------------------------------------------------------------------
+// ─────────────────────────────────────────────────────────────────────────────
+// WhatsApp button
+// ─────────────────────────────────────────────────────────────────────────────
 @Composable
 fun MessageRiderButton(riderName: String, phoneNumber: String, context: Context) {
-    Surface(
-        color    = Color.White,
-        modifier = Modifier.fillMaxWidth()
-    ) {
+    Surface(color = Abyss, modifier = Modifier.fillMaxWidth()) {
         Button(
             onClick = {
-                val rawPhone = phoneNumber.filter { it.isDigit() }
-                val formattedPhone = when {
-                    rawPhone.startsWith("254") -> rawPhone
-                    rawPhone.startsWith("0") -> "254" + rawPhone.substring(1)
-                    else -> if (rawPhone.length == 9) "254$rawPhone" else rawPhone
+                val raw = phoneNumber.filter { it.isDigit() }
+                val formatted = when {
+                    raw.startsWith("254") -> raw
+                    raw.startsWith("0")   -> "254" + raw.substring(1)
+                    raw.length == 9       -> "254$raw"
+                    else                  -> raw
                 }
-                val msg  = "Hi $riderName, I saw your profile on Community Ride app..."
-                val uri  = Uri.parse("https://api.whatsapp.com/send?phone=$formattedPhone&text=$msg")
-                val intent = Intent(Intent.ACTION_VIEW, uri)
+                val msg    = "Hi $riderName, I saw your profile on Community Ride app..."
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://api.whatsapp.com/send?phone=$formatted&text=$msg"))
                 context.startActivity(intent)
             },
             modifier = Modifier
@@ -729,58 +614,26 @@ fun MessageRiderButton(riderName: String, phoneNumber: String, context: Context)
             shape  = RoundedCornerShape(14.dp),
             colors = ButtonDefaults.buttonColors(containerColor = WhatsApp)
         ) {
-            Icon(
-                painter            = painterResource(R.drawable.ic_message),
-                contentDescription = null,
-                modifier           = Modifier.size(20.dp),
-                tint               = Color.White
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                "Message $riderName",
-                fontSize   = 16.sp,
-                fontWeight = FontWeight.Bold,
-                color      = Color.White
-            )
+            Icon(painterResource(R.drawable.ic_message), null, modifier = Modifier.size(20.dp), tint = Color.White)
+            Spacer(Modifier.width(8.dp))
+            Text("Message $riderName", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.White)
         }
     }
 }
 
-// ---------------------------------------------------------------------------
-// Shared helpers
-// ---------------------------------------------------------------------------
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
 @Composable
-private fun SectionLabel(text: String) {
-    Text(
-        text          = text,
-        fontSize      = 11.sp,
-        fontWeight    = FontWeight.Bold,
-        color         = GreenHint,
-        letterSpacing = 1.sp
-    )
+private fun RPSectionLabel(text: String) {
+    Text(text, fontSize = 10.5.sp, fontWeight = FontWeight.Bold, color = TextSecondary, letterSpacing = 1.sp)
 }
 
-private fun drawDotGrid(scope: androidx.compose.ui.graphics.drawscope.DrawScope) {
-    val step = 16f
-    val dot  = Color.White.copy(alpha = 0.06f)
-    var x = 0f
-    while (x < scope.size.width) {
-        var y = 0f
-        while (y < scope.size.height) {
-            scope.drawCircle(dot, 1f, Offset(x, y))
-            y += step
-        }
-        x += step
-    }
-}
-
-// ---------------------------------------------------------------------------
+// ─────────────────────────────────────────────────────────────────────────────
 // Preview
-// ---------------------------------------------------------------------------
+// ─────────────────────────────────────────────────────────────────────────────
 @Preview(showBackground = true, showSystemUi = true)
 @Composable
-fun PreviewRiderProfileScreen() {
-    MaterialTheme {
-        RiderProfileScreen(onBack = {})
-    }
+fun PreviewRiderProfileScreenDark() {
+    MaterialTheme { RiderProfileScreen(onBack = {}) }
 }

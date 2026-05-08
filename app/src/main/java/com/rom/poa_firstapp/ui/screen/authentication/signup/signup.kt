@@ -94,7 +94,7 @@ fun SignupScreen(
 
     LaunchedEffect(authViewModel.isSuccess) {
         if (authViewModel.isSuccess) {
-            navController.navigate(ROUTES.Home.name) {
+            navController.navigate(ROUTES.ProfileSetup.name) {
                 popUpTo(ROUTES.Signup.name) { inclusive = true }
             }
         }

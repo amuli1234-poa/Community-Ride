@@ -12,6 +12,7 @@ interface AuthRepository {
     suspend fun signOut(): Result<Unit>
     suspend fun sendPasswordResetEmail(email: String): Result<Unit>
     fun isUserLoggedIn(): Boolean
+    fun getCurrentUserId(): String?
 }
 
 class AuthRepositoryImpl(
@@ -66,5 +67,9 @@ class AuthRepositoryImpl(
 
     override fun isUserLoggedIn(): Boolean {
         return supabaseClient.auth.currentSessionOrNull() != null
+    }
+
+    override fun getCurrentUserId(): String? {
+        return supabaseClient.auth.currentUserOrNull()?.id
     }
 }

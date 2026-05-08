@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import coil3.compose.AsyncImage
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.rom.poa_firstapp.data.model.Ride
 import com.rom.poa_firstapp.data.remote.SupabaseModule
 import com.rom.poa_firstapp.data.repository.NotificationRepositoryImpl
@@ -44,6 +45,22 @@ import com.rom.poa_firstapp.data.repository.RideRepositoryImpl
 import com.rom.poa_firstapp.ui.navigation.ROUTES
 import io.github.jan.supabase.auth.auth
 import kotlinx.coroutines.launch
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+
+class MyRidesViewModelFactory(
+    private val rideRepository: com.rom.poa_firstapp.data.repository.RideRepository,
+    private val notificationRepository: com.rom.poa_firstapp.data.repository.NotificationRepository,
+    private val userId: String?
+) : ViewModelProvider.Factory {
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(MyRidesViewModel::class.java)) {
+            @Suppress("UNCHECKED_CAST")
+            return MyRidesViewModel(rideRepository, notificationRepository, userId) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class")
+    }
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Design Tokens
@@ -95,36 +112,26 @@ private fun rideStatusLabel(status: String) = when (status.trim().lowercase()) {
 // ─────────────────────────────────────────────────────────────────────────────
 @Composable
 fun MyRidesScreen(navController: NavController) {
-    var selectedTab by remember { mutableIntStateOf(0) }
-    var driverRides by remember { mutableStateOf<List<Ride>>(emptyList()) }
-    var passengerRides by remember { mutableStateOf<List<Ride>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(true) }
-    var unreadCount by remember { mutableIntStateOf(0) }
+    val userId = remember { SupabaseModule.client.auth.currentSessionOrNull()?.user?.id }
+    val viewModel: MyRidesViewModel = viewModel(
+        factory = MyRidesViewModelFactory(
+            RideRepositoryImpl(SupabaseModule.client),
+            NotificationRepositoryImpl(SupabaseModule.client),
+            userId
+        )
+    )
 
-    val rideRepository = remember { RideRepositoryImpl(SupabaseModule.client) }
-    val notificationRepository = remember { NotificationRepositoryImpl(SupabaseModule.client) }
-    val userId = SupabaseModule.client.auth.currentSessionOrNull()?.user?.id
+    val selectedTab = viewModel.selectedTab
+    val isLoading = viewModel.isLoading
+    val unreadCount = viewModel.unreadCount
+    val driverRides = viewModel.driverRides
+    val passengerRides = viewModel.passengerRides
+
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
     var showDeleteDialog by remember { mutableStateOf<String?>(null) }
     var showCancelBookingDialog by remember { mutableStateOf<String?>(null) }
-
-    fun refreshRides() {
-        userId?.let {
-            scope.launch {
-                isLoading = true
-                driverRides = rideRepository.getUserRides(it)
-                passengerRides = rideRepository.getUserBookedRides(it)
-                isLoading = false
-            }
-        }
-    }
-
-    LaunchedEffect(userId) {
-        refreshRides()
-        userId?.let { unreadCount = notificationRepository.getUnreadCount(it) }
-    }
 
     Box(
         modifier = Modifier
@@ -138,7 +145,7 @@ fun MyRidesScreen(navController: NavController) {
                 unreadCount = unreadCount
             )
 
-            PillTabRow(selectedTab = selectedTab, onTabChange = { selectedTab = it })
+            PillTabRow(selectedTab = selectedTab, onTabChange = { viewModel.onTabChange(it) })
 
             val currentRides = if (selectedTab == 0) driverRides else passengerRides
 
@@ -176,9 +183,8 @@ fun MyRidesScreen(navController: NavController) {
                 onConfirm = {
                     showDeleteDialog = null
                     scope.launch {
-                        val result = rideRepository.deleteRide(id)
+                        val result = viewModel.deleteRide(id)
                         Toast.makeText(context, if (result.isSuccess) "Ride deleted successfully" else "Failed to delete ride", Toast.LENGTH_SHORT).show()
-                        if (result.isSuccess) refreshRides()
                     }
                 },
                 onDismiss = { showDeleteDialog = null }
@@ -193,12 +199,9 @@ fun MyRidesScreen(navController: NavController) {
                 confirmColor = RedPrimary,
                 onConfirm = {
                     showCancelBookingDialog = null
-                    userId?.let {
-                        scope.launch {
-                            val result = rideRepository.cancelBooking(id, it)
-                            Toast.makeText(context, if (result.isSuccess) "Booking cancelled" else "Failed to cancel booking", Toast.LENGTH_SHORT).show()
-                            if (result.isSuccess) refreshRides()
-                        }
+                    scope.launch {
+                        val result = viewModel.cancelBooking(id)
+                        Toast.makeText(context, if (result.isSuccess) "Booking cancelled" else "Failed to cancel booking", Toast.LENGTH_SHORT).show()
                     }
                 },
                 onDismiss = { showCancelBookingDialog = null }

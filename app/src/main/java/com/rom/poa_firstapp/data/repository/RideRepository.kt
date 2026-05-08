@@ -1,6 +1,9 @@
 package com.rom.poa_firstapp.data.repository
 
 import com.rom.poa_firstapp.data.model.Ride
+import com.rom.poa_firstapp.data.model.RiderProfile
+import com.rom.poa_firstapp.data.model.Booking
+import android.util.Log
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.realtime.PostgresAction
@@ -8,12 +11,15 @@ import io.github.jan.supabase.realtime.Realtime
 import io.github.jan.supabase.realtime.channel
 import io.github.jan.supabase.realtime.postgresChangeFlow
 import io.github.jan.supabase.realtime.realtime
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 interface RideRepository {
     fun getRidesFlow(): Flow<PostgresAction>
+    suspend fun subscribeToRides()
     suspend fun getAllRides(): List<Ride>
     suspend fun postRide(ride: Ride): Result<Unit>
     suspend fun getRideById(id: String): Ride?
@@ -35,37 +41,56 @@ class RideRepositoryImpl(
         return channel.postgresChangeFlow<PostgresAction>(schema = "public") {
             table = "rides"
         }.onStart {
-            try {
-                channel.subscribe()
-                println("DEBUG: Successfully subscribed to rides_channel")
-            } catch (e: Exception) {
-                println("DEBUG: Realtime subscription error: ${e.message}")
-            }
+            channel.subscribe()
         }
     }
 
-    override suspend fun getAllRides(): List<Ride> {
-        val rides = supabaseClient.from("rides").select().decodeList<Ride>()
-        if (rides.isEmpty()) return emptyList()
+    override suspend fun subscribeToRides() {
+        // No-op or just leave it if needed by other callers, 
+        // but the flow should handle subscription now.
+    }
 
-        val riderIds = rides.map { it.rider_id }.distinct()
-        val profiles = try {
-            supabaseClient.from("profiles").select {
-                filter {
-                    isIn("id", riderIds)
-                }
-            }.decodeList<com.rom.poa_firstapp.data.model.RiderProfile>()
+    override suspend fun getAllRides(): List<Ride> = withContext(Dispatchers.IO) {
+        try {
+            // Fetch all rides
+            val rides = supabaseClient.from("rides")
+                .select()
+                .decodeList<Ride>()
+
+            if (rides.isEmpty()) {
+                Log.d("RideRepo", "No rides found")
+                return@withContext emptyList()
+            }
+
+            // Get unique rider IDs
+            val riderIds = rides.map { it.rider_id }.distinct()
+
+            // Fetch profiles for avatars
+            val profiles = try {
+                supabaseClient.from("profiles")
+                    .select {
+                        filter { isIn("id", riderIds) }
+                    }
+                    .decodeList<RiderProfile>()
+            } catch (e: Exception) {
+                Log.e("RideRepo", "Failed to fetch profiles", e)
+                emptyList()
+            }
+
+            val avatarMap = profiles.associate { it.id to it.avatar_url }
+
+            // Attach avatar and return
+            return@withContext rides.map { ride ->
+                ride.copy(
+                    rider_avatar_url = avatarMap[ride.rider_id]
+                )
+            }
+
         } catch (e: Exception) {
+            Log.e("RideRepo", "Error in getAllRides", e)
             emptyList()
         }
-
-        val avatarMap = profiles.associate { it.id to it.avatar_url }
-
-        return rides.map { ride ->
-            ride.copy(rider_avatar_url = avatarMap[ride.rider_id])
-        }
     }
-
     override suspend fun postRide(ride: Ride): Result<Unit> {
         return try {
             println("DEBUG: Posting ride to Supabase: $ride")
@@ -90,7 +115,7 @@ class RideRepositoryImpl(
             val profile = try {
                 supabaseClient.from("profiles").select {
                     filter { eq("id", ride.rider_id) }
-                }.decodeSingleOrNull<com.rom.poa_firstapp.data.model.RiderProfile>()
+                }.decodeSingleOrNull<RiderProfile>()
             } catch (e: Exception) {
                 null
             }
@@ -139,8 +164,8 @@ class RideRepositoryImpl(
         }
     }
 
-    override suspend fun searchRides(query: String): List<Ride> {
-        return try {
+    override suspend fun searchRides(query: String): List<Ride> = withContext(Dispatchers.IO) {
+        try {
             supabaseClient.from("rides").select {
                 filter {
                     or {
@@ -173,7 +198,7 @@ class RideRepositoryImpl(
                 filter {
                     eq("user_id", userId)
                 }
-            }.decodeList<com.rom.poa_firstapp.data.model.Booking>()
+            }.decodeList<Booking>()
             
             val rideIds = bookings.map { it.ride_id }
             if (rideIds.isEmpty()) return emptyList()

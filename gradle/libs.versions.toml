@@ -50,6 +50,7 @@ supabase-realtime = { module = "io.github.jan-tennert.supabase:realtime-kt" }
 supabase-auth = { module = "io.github.jan-tennert.supabase:auth-kt" }
 supabase-storage = { module = "io.github.jan-tennert.supabase:storage-kt" }
 ktor-client-android = { module = "io.ktor:ktor-client-android", version.ref = "ktor" }
+ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "ktor" }
 androidx-compose-foundation = { group = "androidx.compose.foundation", name = "foundation", version.ref = "foundation" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
 

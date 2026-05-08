@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
+import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
 import com.rom.poa_firstapp.data.model.Ride
 import com.rom.poa_firstapp.data.remote.SupabaseModule
@@ -37,7 +38,22 @@ import com.rom.poa_firstapp.data.repository.RideRepositoryImpl
 import com.rom.poa_firstapp.ui.common.LoadingState
 import com.rom.poa_firstapp.ui.navigation.ROUTES
 import io.github.jan.supabase.auth.auth
-import kotlinx.coroutines.launch
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+
+class RideDetailsViewModelFactory(
+    private val rideId: String,
+    private val rideRepository: com.rom.poa_firstapp.data.repository.RideRepository,
+    private val messageRepository: com.rom.poa_firstapp.data.repository.MessageRepository
+) : ViewModelProvider.Factory {
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(RideDetailsViewModel::class.java)) {
+            @Suppress("UNCHECKED_CAST")
+            return RideDetailsViewModel(rideId, rideRepository, messageRepository) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class")
+    }
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Design Tokens
@@ -83,19 +99,19 @@ fun RideDetailsScreen(
     navController: NavHostController,
     rideId: String
 ) {
-    val context           = LocalContext.current
-    val scope             = rememberCoroutineScope()
-    val rideRepository    = remember { RideRepositoryImpl(SupabaseModule.client) }
-    val messageRepository = remember { MessageRepositoryImpl(SupabaseModule.client) }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val viewModel: RideDetailsViewModel = viewModel(
+        factory = RideDetailsViewModelFactory(
+            rideId,
+            RideRepositoryImpl(SupabaseModule.client),
+            MessageRepositoryImpl(SupabaseModule.client)
+        )
+    )
 
-    var ride      by remember { mutableStateOf<Ride?>(null) }
-    var isLoading by remember { mutableStateOf(true) }
-    var isBooking by remember { mutableStateOf(false) }
-
-    LaunchedEffect(rideId) {
-        ride      = rideRepository.getRideById(rideId)
-        isLoading = false
-    }
+    val ride = viewModel.ride
+    val isLoading = viewModel.isLoading
+    val isBooking = viewModel.isBooking
 
     Scaffold(
         topBar = {
@@ -180,36 +196,28 @@ fun RideDetailsScreen(
                         val text = "Hello ${r.rider_name}, I'm interested in your ride to ${r.destination}."
                         val currentUserId = SupabaseModule.client.auth.currentSessionOrNull()?.user?.id
                         if (currentUserId != null) {
-                            scope.launch {
-                                messageRepository.startWhatsAppConversation(
-                                    senderId    = currentUserId,
-                                    recipientId = r.rider_id,
-                                    content     = text
-                                )
+                            viewModel.startWhatsAppConversation(currentUserId, text) {
+                                try {
+                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://api.whatsapp.com/send?phone=$phone&text=${Uri.encode(text)}")))
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "Could not open WhatsApp", Toast.LENGTH_SHORT).show()
+                                }
                             }
-                        }
-                        try {
-                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://api.whatsapp.com/send?phone=$phone&text=${Uri.encode(text)}")))
-                        } catch (e: Exception) {
-                            Toast.makeText(context, "Could not open WhatsApp", Toast.LENGTH_SHORT).show()
                         }
                     },
                     onBook = {
-                        scope.launch {
-                            isBooking = true
-                            val userId = SupabaseModule.client.auth.currentUserOrNull()?.id
-                            if (userId != null) {
-                                val result = rideRepository.bookRide(r.id, userId)
+                        val userId = SupabaseModule.client.auth.currentUserOrNull()?.id
+                        if (userId != null) {
+                            viewModel.bookRide(userId) { result ->
                                 if (result.isSuccess) {
                                     Toast.makeText(context, "Ride booked successfully! 🚗", Toast.LENGTH_LONG).show()
                                     navController.popBackStack()
                                 } else {
                                     Toast.makeText(context, "Error: ${result.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
                                 }
-                            } else {
-                                Toast.makeText(context, "Please login to book a ride", Toast.LENGTH_SHORT).show()
                             }
-                            isBooking = false
+                        } else {
+                            Toast.makeText(context, "Please login to book a ride", Toast.LENGTH_SHORT).show()
                         }
                     }
                 )

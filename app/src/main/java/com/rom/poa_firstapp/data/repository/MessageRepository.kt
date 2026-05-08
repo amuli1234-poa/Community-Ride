@@ -140,9 +140,10 @@ class MessageRepositoryImpl(
 
     override fun getMessagesFlow(userId: String): Flow<PostgresAction> {
         val channel = supabaseClient.realtime.channel("messages_$userId")
-        return channel.postgresChangeFlow<PostgresAction>(schema = "public") {
+        val flow = channel.postgresChangeFlow<PostgresAction>(schema = "public") {
             table = "messages"
-        }.onStart {
+        }
+        return flow.onStart {
             try {
                 channel.subscribe()
                 println("DEBUG: Successfully subscribed to messages_$userId")

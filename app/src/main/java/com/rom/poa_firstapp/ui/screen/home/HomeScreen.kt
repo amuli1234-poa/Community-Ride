@@ -9,6 +9,7 @@ import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.webkit.JavascriptInterface
+import java.lang.ref.WeakReference
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
@@ -103,6 +104,50 @@ private val SHEET_FULL_HEIGHT = 620.dp
 private val NAV_HEIGHT        = 72.dp   // fixed bottom nav height
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Map Manager — Singleton to control WebView from other screens
+// ─────────────────────────────────────────────────────────────────────────────
+object MapManager {
+    private var webViewRef: WeakReference<WebView>? = null
+
+    fun setWebView(webView: WebView) {
+        webViewRef = WeakReference(webView)
+    }
+
+    fun refreshMap() {
+        webViewRef?.get()?.let { webView ->
+            webView.post {
+                webView.reload()
+            }
+        }
+    }
+
+    fun evaluateJavascript(js: String) {
+        webViewRef?.get()?.let { webView ->
+            webView.post {
+                webView.evaluateJavascript(js, null)
+            }
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+private fun buildRideJs(ride: Ride): String {
+    val name = ride.rider_name.replace("'", "\\'").replace("\"", "\\\"")
+    val dest = (ride.destination ?: "Unknown").replace("'", "\\'").replace("\"", "\\\"")
+    val pick = (ride.pickup_location ?: "Unknown").replace("'", "\\'").replace("\"", "\\\"")
+    val dep  = (ride.departure_time ?: "N/A").replace("'", "\\'").replace("\"", "\\\"")
+    val date = (ride.departure_date ?: "N/A").replace("'", "\\'").replace("\"", "\\\"")
+    val color = statusMarkerColor(ride.status ?: "free")
+    val avatar = ride.rider_avatar_url ?: ""
+    val lat = ride.start_lat ?: 0.0
+    val lng = ride.start_lng ?: 0.0
+
+    return "addOrUpdateRideMarker('${ride.id}','${ride.rider_id}',\"$name\",${ride.seats_left},'${ride.rider_phone}',$lat,$lng,'${ride.status}',\"$dest\",\"$pick\",\"$dep\",\"$date\",'$avatar','$color');"
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // HomeScreen
 // ─────────────────────────────────────────────────────────────────────────────
 @Composable
@@ -114,10 +159,14 @@ fun HomeScreen(
             ProfileRepositoryImpl(SupabaseModule.client),
             SupabaseModule.client
         )
+    },
+    homeViewModel: HomeViewModel = viewModel {
+        HomeViewModel(RideRepositoryImpl(SupabaseModule.client))
     }
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) { profileViewModel.loadProfile() }
     val profile = profileViewModel.profile
@@ -136,18 +185,62 @@ fun HomeScreen(
         }
     }
 
-    val rideRepository = remember { RideRepositoryImpl(SupabaseModule.client) }
-    val scope          = rememberCoroutineScope()
-    var isLoading      by remember { mutableStateOf(false) }
-    var errorMessage   by remember { mutableStateOf<String?>(null) }
-
-    // Draggable sheet — start expanded
+    // Draggable sheet state
     val peekOffset = remember(density) { with(density) { (SHEET_FULL_HEIGHT - SHEET_PEEK_HEIGHT).toPx() } }
-    val offsetY    = remember { Animatable(peekOffset) }
+    val offsetY = remember { Animatable(peekOffset) }
 
     val navigateToProfile: (String?) -> Unit = { uid ->
         val route = if (uid != null) "${ROUTES.Profile.name}?profileId=$uid" else ROUTES.Profile.name
         navController.navigate(route)
+    }
+
+    var webViewInstance by remember { mutableStateOf<WebView?>(null) }
+    var isMapReady by remember { mutableStateOf(false) }
+
+    // Synchronize markers when rides change or map is ready
+    LaunchedEffect(homeViewModel.rides, isMapReady) {
+        if (isMapReady && webViewInstance != null) {
+            Log.d("HomeScreen", "Syncing ${homeViewModel.rides.size} rides to map")
+            
+            // Clear existing markers
+            webViewInstance?.evaluateJavascript("for(var id in rideMarkers) removeRideMarker(id);", null)
+
+            homeViewModel.rides.forEach { ride ->
+                if (ride.start_lat == null || ride.start_lng == null || ride.start_lat == 0.0) {
+                    Log.w("HomeScreen", "Ride ${ride.id} has invalid coordinates: ${ride.start_lat}, ${ride.start_lng}")
+                }
+                val js = buildRideJs(ride)
+                webViewInstance?.evaluateJavascript(js, null)
+            }
+            
+            // Auto-fit to show all markers
+            webViewInstance?.evaluateJavascript("fitAllMarkers();", null)
+        }
+    }
+
+    // Handle Realtime Actions separately for efficiency
+    LaunchedEffect(isMapReady) {
+        if (isMapReady) {
+            homeViewModel.rideActions.collect { action ->
+                when (action) {
+                    is PostgresAction.Insert -> {
+                        val ride = action.decodeRecord<Ride>()
+                        webViewInstance?.evaluateJavascript(buildRideJs(ride), null)
+                    }
+                    is PostgresAction.Update -> {
+                        val ride = action.decodeRecord<Ride>()
+                        webViewInstance?.evaluateJavascript(buildRideJs(ride), null)
+                    }
+                    is PostgresAction.Delete -> {
+                        val id = action.oldRecord["id"]?.toString()?.replace("\"", "")
+                        if (id != null) {
+                            webViewInstance?.evaluateJavascript("removeRideMarker('$id');", null)
+                        }
+                    }
+                    else -> {}
+                }
+            }
+        }
     }
 
     Box(
@@ -155,9 +248,6 @@ fun HomeScreen(
             .fillMaxSize()
             .background(Abyss)
     ) {
-        var isMapReady by remember { mutableStateOf(false) }
-        var webView: WebView? by remember { mutableStateOf(null) }
-
         // ── Map (WebView) ─────────────────────────────────────────
         if (LocalInspectionMode.current) {
             Box(
@@ -171,87 +261,44 @@ fun HomeScreen(
                 modifier = Modifier.fillMaxSize(),
                 factory = { ctx ->
                     WebView(ctx).apply {
-                        webView = this
+                        webViewInstance = this
+                        MapManager.setWebView(this)
                         layoutParams = ViewGroup.LayoutParams(
                             ViewGroup.LayoutParams.MATCH_PARENT,
                             ViewGroup.LayoutParams.MATCH_PARENT
                         )
                         webViewClient = object : WebViewClient() {
                             override fun onPageFinished(view: WebView?, url: String?) {
-                                super.onPageFinished(view, url)
                                 isMapReady = true
-                                scope.launch {
-                                    try {
-                                        val rides = rideRepository.getAllRides()
-                                        (ctx as? androidx.activity.ComponentActivity)?.runOnUiThread {
-                                            rides.forEach { ride ->
-                                                val name  = ride.rider_name.replace("'", "\\'").replace("\"", "\\\"")
-                                                val dest  = (ride.destination ?: "N/A").replace("'", "\\'").replace("\"", "\\\"")
-                                                val pick  = (ride.pickup_location ?: "N/A").replace("'", "\\'").replace("\"", "\\\"")
-                                                val dep   = (ride.departure_time ?: "N/A").replace("'", "\\'").replace("\"", "\\\"")
-                                                val date  = (ride.departure_date ?: "N/A").replace("'", "\\'").replace("\"", "\\\"")
-                                                val color = statusMarkerColor(ride.status)
-                                                val js    = "addOrUpdateRideMarker('${ride.id}','${ride.rider_id}',\"$name\",${ride.seats_left},'${ride.rider_phone}',${ride.start_lat},${ride.start_lng},'${ride.status}',\"$dest\",\"$pick\",\"$dep\",\"$date\",'${ride.rider_avatar_url ?: ""}','$color');"
-                                                evaluateJavascript(js, null)
-                                            }
-                                        }
-                                    } catch (e: Exception) {
-                                        Log.e("HomeScreen", "Error loading initial rides", e)
-                                    }
-                                }
                             }
                         }
-                        settings.javaScriptEnabled  = true
-                        settings.setGeolocationEnabled(true)
-                        settings.domStorageEnabled  = true
+                        settings.apply {
+                            javaScriptEnabled = true
+                            setGeolocationEnabled(true)
+                            domStorageEnabled = true
+                            cacheMode = android.webkit.WebSettings.LOAD_CACHE_ELSE_NETWORK
+                        }
                         webChromeClient = object : WebChromeClient() {
-                            override fun onConsoleMessage(msg: android.webkit.ConsoleMessage?) = true
                             override fun onGeolocationPermissionsShowPrompt(origin: String?, callback: GeolocationPermissions.Callback?) {
-                                val granted = ContextCompat.checkSelfPermission(ctx, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-                                callback?.invoke(origin, granted, false)
+                                callback?.invoke(origin, true, false)
+                            }
+                            override fun onConsoleMessage(consoleMessage: android.webkit.ConsoleMessage?): Boolean {
+                                Log.d("WebViewConsole", "${consoleMessage?.messageLevel()}: ${consoleMessage?.message()} -- From line ${consoleMessage?.lineNumber()} of ${consoleMessage?.sourceId()}")
+                                return true
                             }
                         }
                         addJavascriptInterface(object {
                             @JavascriptInterface
                             fun onMarkerClick(id: String, riderId: String, name: String, seats: Int, phone: String, lat: Double, lng: Double, status: String) {
-                                (ctx as? androidx.activity.ComponentActivity)?.runOnUiThread {
+                                post {
                                     navController.navigate("${ROUTES.RideDetails.name}/$id")
                                 }
                             }
                         }, "Android")
                         loadUrl("file:///android_asset/index.html")
-                        scope.launch {
-                            rideRepository.getRidesFlow().collect { action ->
-                                if (isMapReady) {
-                                    (ctx as? androidx.activity.ComponentActivity)?.runOnUiThread {
-                                        try {
-                                            fun buildJs(ride: Ride): String {
-                                                val name  = ride.rider_name.replace("'", "\\'").replace("\"", "\\\"")
-                                                val dest  = (ride.destination ?: "N/A").replace("'", "\\'").replace("\"", "\\\"")
-                                                val pick  = (ride.pickup_location ?: "N/A").replace("'", "\\'").replace("\"", "\\\"")
-                                                val dep   = (ride.departure_time ?: "N/A").replace("'", "\\'").replace("\"", "\\\"")
-                                                val date  = (ride.departure_date ?: "N/A").replace("'", "\\'").replace("\"", "\\\"")
-                                                val color = statusMarkerColor(ride.status)
-                                                return "addOrUpdateRideMarker('${ride.id}','${ride.rider_id}',\"$name\",${ride.seats_left},'${ride.rider_phone}',${ride.start_lat},${ride.start_lng},'${ride.status}',\"$dest\",\"$pick\",\"$dep\",\"$date\",'${ride.rider_avatar_url ?: ""}','$color');"
-                                            }
-                                            when (action) {
-                                                is PostgresAction.Insert -> evaluateJavascript(buildJs(action.decodeRecord()), null)
-                                                is PostgresAction.Update -> evaluateJavascript(buildJs(action.decodeRecord()), null)
-                                                is PostgresAction.Delete -> {
-                                                    val id = action.oldRecord["id"]?.toString()?.replace("\"", "")
-                                                    if (id != null) evaluateJavascript("removeRideMarker('$id');", null)
-                                                }
-                                                else -> {}
-                                            }
-                                        } catch (e: Exception) {
-                                            Log.e("HomeScreen", "Realtime update error", e)
-                                        }
-                                    }
-                                }
-                            }
-                        }
                     }
-                }
+                },
+                update = { /* Updates handled via LaunchedEffects for performance */ }
             )
         }
 
@@ -285,7 +332,7 @@ fun HomeScreen(
                 .align(Alignment.BottomEnd)
                 .padding(end = 16.dp)
                 .offset(y = -fabOffset),
-            onClick  = { webView?.evaluateJavascript("mymap.locate({setView: true});", null) }
+            onClick  = { webViewInstance?.evaluateJavascript("mymap.locate({setView: true});", null) }
         )
 
         // ── Draggable bottom sheet ─────────────────────────────────
@@ -337,8 +384,8 @@ fun HomeScreen(
             )
         }
 
-        if (isLoading) LoadingState()
-        errorMessage?.let { ErrorState(message = it) }
+        if (homeViewModel.isLoading) LoadingState()
+        homeViewModel.errorMessage?.let { ErrorState(message = it) }
     }
 }
 

@@ -8,113 +8,165 @@
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
-        body { margin: 0; padding: 0; }
-        #mapid { width: 100vw; height: 100vh; }
+        body { margin: 0; padding: 0; background-color: #f0f0f0; }
+        #mapid { width: 100vw; height: 100vh; background: #f0f0f0; }
+
         .custom-marker-icon {
-            background-color: white;
+            background-color: #0E1325;
             border-radius: 50%;
-            border: 2px solid;
+            border: 2px solid #00E5FF;
             width: 36px;
             height: 36px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 18px;
+            font-size: 16px;
             color: white;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            box-shadow: 0 0 12px rgba(0, 229, 255, 0.5);
             overflow: hidden;
+            transition: all 0.3s ease;
         }
-        .custom-marker-icon.green { border-color: #4CAF50; background-color: #4CAF50; }
-        .custom-marker-icon.red { border-color: #F44336; background-color: #F44336; }
-        .custom-marker-icon.yellow { border-color: #FFC107; background-color: #FFC107; }
-        .custom-marker-icon.blue-dot { border-color: #2196F3; background-color: #2196F3; width: 16px; height: 16px; }
 
         .marker-avatar {
             width: 100%;
             height: 100%;
             object-fit: cover;
+            border-radius: 50%;
         }
 
-        /* Style for the permanent label */
         .ride-tooltip {
-            background-color: white;
-            border: 1px solid #4CAF50;
-            border-radius: 4px;
-            padding: 4px 8px;
-            font-size: 11px;
-            font-weight: bold;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            background-color: #0E1325;
+            border: 1px solid #00E5FF;
+            color: #E8EEFF;
+            border-radius: 8px;
+            padding: 6px 10px;
+            font-size: 12px;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            font-weight: 600;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
             white-space: nowrap;
         }
+
         .leaflet-tooltip-top:before {
-            border-top-color: #4CAF50;
+            border-top-color: #00E5FF;
+        }
+
+        /* Pulse animation for markers */
+        @keyframes pulse-cyan {
+            0% { box-shadow: 0 0 0 0 rgba(0, 229, 255, 0.6); }
+            70% { box-shadow: 0 0 0 10px rgba(0, 229, 255, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(0, 229, 255, 0); }
+        }
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(255, 59, 71, 0.6); }
+            70% { box-shadow: 0 0 0 10px rgba(255, 59, 71, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 59, 71, 0); }
+        }
+        @keyframes pulse-green {
+            0% { box-shadow: 0 0 0 0 rgba(0, 255, 163, 0.6); }
+            70% { box-shadow: 0 0 0 10px rgba(0, 255, 163, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(0, 255, 163, 0); }
+        }
+        @keyframes pulse-yellow {
+            0% { box-shadow: 0 0 0 0 rgba(255, 187, 0, 0.6); }
+            70% { box-shadow: 0 0 0 10px rgba(255, 187, 0, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 187, 0, 0); }
+        }
+
+        .pulse-cyan { animation: pulse-cyan 2s infinite; }
+        .pulse-red { animation: pulse-red 2s infinite; }
+        .pulse-green { animation: pulse-green 2s infinite; }
+        .pulse-yellow { animation: pulse-yellow 2s infinite; }
+
+        .custom-marker-icon.blue-dot {
+            border-color: #00E5FF;
+            background-color: #00E5FF;
+            width: 14px;
+            height: 14px;
+            box-shadow: 0 0 15px #00E5FF;
         }
     </style>
 </head>
 <body>
 <div id="mapid"></div>
 <script>
-    var mymap = L.map("mapid").setView([-1.286389, 36.817223], 12);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(mymap);
+    console.log("Map script initializing...");
+    var mymap = L.map("mapid", { zoomControl: false }).setView([-1.286389, 36.817223], 12);
+
+    // Standard OpenStreetMap tiles
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        maxZoom: 19
+    }).addTo(mymap);
 
     var icons = {
         green: '<i class="fa-solid fa-car"></i>',
         red: '<i class="fa-solid fa-car"></i>',
         yellow: '<i class="fa-solid fa-clock"></i>',
-        blue: L.divIcon({ className: "custom-marker-icon blue-dot", iconSize: [16, 16], iconAnchor: [8, 8] })
+        blue: L.divIcon({ className: "custom-marker-icon blue-dot", iconSize: [14, 14], iconAnchor: [7, 7] })
     };
 
     var rideMarkers = {};
+    console.log("Leaflet initialized. Map object:", mymap);
 
-    function addOrUpdateRideMarker(id, riderId, name, seats, phone, lat, lng, status, destination, pickup, departureTime, departureDate, avatarUrl) {
-        var iconColor = "green";
-        if (status === "Paid") iconColor = "red";
-        if (status === "Pending") iconColor = "yellow";
+function addOrUpdateRideMarker(id, riderId, name, seats, phone, lat, lng, status, destination, pickup, departureTime, departureDate, avatarUrl, markerColor) {
+    console.log("addOrUpdateRideMarker called for id:", id, "at:", lat, lng);
 
-        var htmlContent = icons[iconColor];
-        if (avatarUrl && avatarUrl !== "") {
-            htmlContent = '<img src="' + avatarUrl + '" class="marker-avatar" />';
-        }
+    if (!lat || !lng || lat === 0 || lng === 0) {
+        console.warn("Invalid coordinates for ride:", id);
+        return;
+    }
 
-        var icon = L.divIcon({
-            className: "custom-marker-icon " + iconColor,
-            html: htmlContent,
-            iconSize: [36, 36],
-            iconAnchor: [18, 36]
+    var iconColorClass = "pulse-green";
+    if (status.toLowerCase() === "paid") iconColorClass = "pulse-red";
+    else if (status.toLowerCase() === "free") iconColorClass = "pulse-green";
+    else if (status.toLowerCase() === "pending") iconColorClass = "pulse-yellow";
+    else iconColorClass = "pulse-cyan";
+
+    var htmlContent = '<i class="fa-solid fa-car"></i>';
+    if (avatarUrl && avatarUrl !== "") {
+        htmlContent = '<img src="' + avatarUrl + '" class="marker-avatar" onerror="this.style.display=\'none\'; this.parentElement.innerHTML=\'<i class=\\\'fa-solid fa-car\\\'></i>\';" />';
+    }
+
+    var icon = L.divIcon({
+        className: "custom-marker-icon " + iconColorClass,
+        html: htmlContent,
+        iconSize: [36, 36],
+        iconAnchor: [18, 36]
+    });
+
+    var labelContent = `<strong>${name}</strong><br>From: ${pickup}<br>To: ${destination}<br>${departureDate} at ${departureTime}<br>Seats: ${seats}`;
+
+    if (rideMarkers[id]) {
+        rideMarkers[id].setLatLng([lat, lng]);
+        rideMarkers[id].setIcon(icon);
+        rideMarkers[id].setTooltipContent(labelContent);
+        rideMarkers[id].departureTime = departureTime;
+        rideMarkers[id].departureDate = departureDate;
+    } else {
+        var marker = L.marker([lat, lng], { icon: icon }).addTo(mymap);
+        marker.departureTime = departureTime;
+        marker.departureDate = departureDate;
+
+        marker.bindTooltip(labelContent, {
+            permanent: true,
+            direction: 'top',
+            offset: [0, -35],
+            className: 'ride-tooltip'
         });
 
-        var labelContent = "<strong>" + name + "</strong><br>" +
-                           "From: " + (pickup || "N/A") + "<br>" +
-                           "To: " + (destination || "N/A") + "<br>" +
-                           "Date: " + (departureDate || "N/A") + "<br>" +
-                           "Time: " + (departureTime || "N/A") + "<br>" +
-                           "Seats: " + seats;
+        marker.on('click', function() {
+            if (window.Android) window.Android.onMarkerClick(id, riderId, name, seats, phone, lat, lng, status);
+        });
 
-        if (rideMarkers[id]) {
-            rideMarkers[id].setLatLng([lat, lng]);
-            rideMarkers[id].setIcon(icon);
-            rideMarkers[id].setTooltipContent(labelContent);
-            rideMarkers[id].departureTime = departureTime;
-            rideMarkers[id].departureDate = departureDate;
-        } else {
-            var marker = L.marker([lat, lng], {icon: icon}).addTo(mymap);
-            marker.departureTime = departureTime;
-            marker.departureDate = departureDate;
+        rideMarkers[id] = marker;
+    }
+}
 
-            // Add a permanent tooltip (label) on top of the marker
-            marker.bindTooltip(labelContent, {
-                permanent: true,
-                direction: 'top',
-                offset: [0, -32],
-                className: 'ride-tooltip'
-            });
-
-            marker.on('click', function() {
-                if (window.Android) {
-                    window.Android.onMarkerClick(id, riderId, name, seats, phone, lat, lng, status);
-                }
-            });
-            rideMarkers[id] = marker;
+    function fitAllMarkers() {
+        var group = new L.featureGroup(Object.values(rideMarkers));
+        if (group.getLayers().length > 0) {
+            mymap.fitBounds(group.getBounds().pad(0.1));
         }
     }
 
@@ -146,9 +198,12 @@
     // Geolocation
     mymap.on("locationfound", function(e) {
         L.marker(e.latlng, {icon: icons.blue}).addTo(mymap);
-        mymap.setView(e.latlng, 13);
+        if (!window.initialLocationFound) {
+            mymap.setView(e.latlng, 13);
+            window.initialLocationFound = true;
+        }
     });
-    mymap.locate({setView: true, watch: true});
+    mymap.locate({setView: true, watch: false});
 </script>
 </body>
 </html>

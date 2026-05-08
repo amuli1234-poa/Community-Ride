@@ -32,7 +32,7 @@ class AuthViewModel(
             isSuccess = false
             val result = authRepository.signUp(email, password, fullName, username)
             result.onSuccess {
-                successMessage = "Registration successful! Please check your email to confirm your account before logging in."
+                successMessage = "Registration successful!"
                 isSuccess = true
             }.onFailure {
                 errorMessage = it.localizedMessage ?: "Registration failed"

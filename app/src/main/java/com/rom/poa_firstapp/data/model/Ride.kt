@@ -10,13 +10,13 @@ data class Ride(
     val rider_avatar_url: String? = null,
     val seats_left: Int,
     val rider_phone: String,
-    val start_lat: Double,
-    val start_lng: Double,
+    val start_lat: Double? = null,
+    val start_lng: Double? = null,
+    val destination_lat: Double? = null,
+    val destination_lng: Double? = null,
     val status: String,
     val pickup_location: String? = null,
     val destination: String? = null,
     val departure_time: String? = null,
-    val departure_date: String? = null,
-    val destination_lat: Double? = 0.0,
-    val destination_lng: Double? = 0.0
+    val departure_date: String? = null
 )

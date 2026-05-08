@@ -61,7 +61,7 @@ dependencies {
     implementation(libs.supabase.realtime)
     implementation(libs.supabase.auth)
     implementation(libs.supabase.storage)
-    implementation(libs.ktor.client.android)
+    implementation(libs.ktor.client.okhttp)
 
     implementation(libs.coil.compose)
     implementation(libs.androidx.compose.foundation)
