@@ -63,6 +63,7 @@ fun ProfileSetupScreen(
     var fullName by remember { mutableStateOf("") }
     var username by remember { mutableStateOf("") }
     var phoneNumber by remember { mutableStateOf("") }
+    var userType by remember { mutableStateOf("passenger") }
     var bio by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isSaving by remember { mutableStateOf(false) }
@@ -81,13 +82,16 @@ fun ProfileSetupScreen(
     )
 
     fun saveProfile() {
+        println("DEBUG: saveProfile started")
         if (fullName.isBlank() || username.isBlank() || phoneNumber.isBlank()) {
             errorMessage = "Please fill in all required fields"
+            println("DEBUG: Validation failed")
             return
         }
 
         coroutineScope.launch {
             isSaving = true
+            errorMessage = null
             try {
                 val newProfile = RiderProfile(
                     id = userId,
@@ -98,12 +102,16 @@ fun ProfileSetupScreen(
                     rides_given = 0,
                     rides_taken = 0,
                     community_rating = 5.0,
-                    total_reviews = 0
+                    total_reviews = 0,
+                    user_type = userType
                 )
 
+                println("DEBUG: Upserting profile for $userId: $newProfile")
                 SupabaseModule.client.from("profiles").upsert(newProfile)
+                println("DEBUG: Upsert successful, calling onProfileCreated")
                 onProfileCreated()
             } catch (e: Exception) {
+                println("DEBUG: Upsert failed: ${e.message}")
                 errorMessage = e.message ?: "Failed to save profile"
             } finally {
                 isSaving = false
@@ -248,6 +256,51 @@ fun ProfileSetupScreen(
                         keyboardType = KeyboardType.Phone
                     )
 
+                    // User Type Selection
+                    Text(
+                        text = "I AM A...",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextMuted,
+                        letterSpacing = 1.5.sp
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        listOf("passenger", "driver").forEach { type ->
+                            val isSelected = userType == type
+                            Surface(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(52.dp)
+                                    .clickable { userType = type },
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (isSelected) CyanPrimary.copy(alpha = 0.2f) else Crater,
+                                border = BorderStroke(1.dp, if (isSelected) CyanPrimary else GlassEdgeMid)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = if (type == "driver") Icons.Rounded.DirectionsCar else Icons.Rounded.Person,
+                                        contentDescription = null,
+                                        tint = if (isSelected) CyanPrimary else TextSecondary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Text(
+                                        text = type.replaceFirstChar { it.uppercase() },
+                                        color = if (isSelected) CyanPrimary else TextSecondary,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        fontSize = 14.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+
                     NeonTextField(
                         value = bio,
                         onValueChange = { bio = it },
@@ -262,25 +315,36 @@ fun ProfileSetupScreen(
 
                     // Save Button
                     Button(
-                        onClick = { saveProfile() },
+                        onClick = { 
+                            println("DEBUG: Save Button clicked")
+                            if (!isSaving) saveProfile() 
+                        },
                         enabled = !isSaving,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp),
                         shape = RoundedCornerShape(16.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent)
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.Transparent,
+                            disabledContainerColor = TextMuted.copy(alpha = 0.5f)
+                        ),
+                        contentPadding = PaddingValues(0.dp)
                     ) {
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .background(
-                                    Brush.horizontalGradient(listOf(CyanPrimary, PurpleAccent)),
-                                    RoundedCornerShape(16.dp)
+                                    Brush.horizontalGradient(
+                                        if (isSaving) 
+                                            listOf(TextMuted, TextMuted) 
+                                        else 
+                                            listOf(CyanPrimary, PurpleAccent)
+                                    )
                                 ),
                             contentAlignment = Alignment.Center
                         ) {
                             if (isSaving) {
-                                CircularProgressIndicator(color = TextHero, modifier = Modifier.size(26.dp))
+                                CircularProgressIndicator(color = TextHero, modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
                             } else {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
@@ -297,6 +361,9 @@ fun ProfileSetupScreen(
                             }
                         }
                     }
+                    
+                    // Extra spacer at bottom to ensure scrollability
+                    Spacer(modifier = Modifier.height(20.dp))
                 }
             }
         }

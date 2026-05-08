@@ -16,5 +16,6 @@ data class RiderProfile(
     val phone_verified: Boolean = false,
     val email_verified: Boolean = false,
     val phone_number: String? = null,
-    val bio: String? = null
+    val bio: String? = null,
+    val user_type: String = "passenger" // "driver" or "passenger"
 )

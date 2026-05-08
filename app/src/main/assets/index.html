@@ -39,13 +39,35 @@
             border: 1px solid #00E5FF;
             color: #E8EEFF;
             border-radius: 8px;
-            padding: 6px 10px;
-            font-size: 12px;
+            padding: 8px 12px;
+            font-size: 13px;
             font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            font-weight: 600;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            font-weight: 700;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.6);
             white-space: nowrap;
+            text-align: center;
         }
+
+        .ride-tooltip.tooltip-paid {
+            background-color: #FF3B47;
+            border-color: #FF3B47;
+            color: #FFFFFF;
+        }
+        .ride-tooltip.tooltip-paid:before { border-top-color: #FF3B47; }
+
+        .ride-tooltip.tooltip-free {
+            background-color: #00FFA3;
+            border-color: #00FFA3;
+            color: #050811;
+        }
+        .ride-tooltip.tooltip-free:before { border-top-color: #00FFA3; }
+
+        .ride-tooltip.tooltip-pending {
+            background-color: #FFBB00;
+            border-color: #FFBB00;
+            color: #050811;
+        }
+        .ride-tooltip.tooltip-pending:before { border-top-color: #FFBB00; }
 
         .leaflet-tooltip-top:before {
             border-top-color: #00E5FF;
@@ -117,11 +139,20 @@ function addOrUpdateRideMarker(id, riderId, name, seats, phone, lat, lng, status
         return;
     }
 
-    var iconColorClass = "pulse-green";
-    if (status.toLowerCase() === "paid") iconColorClass = "pulse-red";
-    else if (status.toLowerCase() === "free") iconColorClass = "pulse-green";
-    else if (status.toLowerCase() === "pending") iconColorClass = "pulse-yellow";
-    else iconColorClass = "pulse-cyan";
+    var iconColorClass = "pulse-cyan";
+    var tooltipStatusClass = "tooltip-cyan";
+
+    var s = status.toLowerCase();
+    if (s === "paid") {
+        iconColorClass = "pulse-red";
+        tooltipStatusClass = "tooltip-paid";
+    } else if (s === "free") {
+        iconColorClass = "pulse-green";
+        tooltipStatusClass = "tooltip-free";
+    } else if (s === "pending") {
+        iconColorClass = "pulse-yellow";
+        tooltipStatusClass = "tooltip-pending";
+    }
 
     var htmlContent = '<i class="fa-solid fa-car"></i>';
     if (avatarUrl && avatarUrl !== "") {
@@ -135,12 +166,18 @@ function addOrUpdateRideMarker(id, riderId, name, seats, phone, lat, lng, status
         iconAnchor: [18, 36]
     });
 
-    var labelContent = `<strong>${name}</strong><br>From: ${pickup}<br>To: ${destination}<br>${departureDate} at ${departureTime}<br>Seats: ${seats}`;
+    var labelContent = `<div style="line-height: 1.2;">${name}<br><span style="font-size: 0.85em; opacity: 0.9; font-weight: 500;">→ ${destination}</span></div>`;
 
     if (rideMarkers[id]) {
         rideMarkers[id].setLatLng([lat, lng]);
         rideMarkers[id].setIcon(icon);
         rideMarkers[id].setTooltipContent(labelContent);
+        // Update tooltip class if status changed
+        if (rideMarkers[id].getTooltip()) {
+            var tooltip = rideMarkers[id].getTooltip();
+            L.DomUtil.removeClass(tooltip._container, 'tooltip-paid tooltip-free tooltip-pending');
+            L.DomUtil.addClass(tooltip._container, tooltipStatusClass);
+        }
         rideMarkers[id].departureTime = departureTime;
         rideMarkers[id].departureDate = departureDate;
     } else {
@@ -152,7 +189,7 @@ function addOrUpdateRideMarker(id, riderId, name, seats, phone, lat, lng, status
             permanent: true,
             direction: 'top',
             offset: [0, -35],
-            className: 'ride-tooltip'
+            className: 'ride-tooltip ' + tooltipStatusClass
         });
 
         marker.on('click', function() {
@@ -202,6 +239,7 @@ function addOrUpdateRideMarker(id, riderId, name, seats, phone, lat, lng, status
             mymap.setView(e.latlng, 13);
             window.initialLocationFound = true;
         }
+        if (window.Android) window.Android.onLocationUpdate(e.latlng.lat, e.latlng.lng);
     });
     mymap.locate({setView: true, watch: false});
 </script>

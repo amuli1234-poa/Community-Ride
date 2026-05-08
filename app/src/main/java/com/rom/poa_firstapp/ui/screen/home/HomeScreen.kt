@@ -225,11 +225,17 @@ fun HomeScreen(
                 when (action) {
                     is PostgresAction.Insert -> {
                         val ride = action.decodeRecord<Ride>()
-                        webViewInstance?.evaluateJavascript(buildRideJs(ride), null)
+                        if (ride.seats_left > 0 && ride.status != "completed" && ride.status != "cancelled") {
+                            webViewInstance?.evaluateJavascript(buildRideJs(ride), null)
+                        }
                     }
                     is PostgresAction.Update -> {
                         val ride = action.decodeRecord<Ride>()
-                        webViewInstance?.evaluateJavascript(buildRideJs(ride), null)
+                        if (ride.seats_left <= 0 || ride.status == "completed" || ride.status == "cancelled") {
+                            webViewInstance?.evaluateJavascript("removeRideMarker('${ride.id}');", null)
+                        } else {
+                            webViewInstance?.evaluateJavascript(buildRideJs(ride), null)
+                        }
                     }
                     is PostgresAction.Delete -> {
                         val id = action.oldRecord["id"]?.toString()?.replace("\"", "")
@@ -292,6 +298,15 @@ fun HomeScreen(
                             fun onMarkerClick(id: String, riderId: String, name: String, seats: Int, phone: String, lat: Double, lng: Double, status: String) {
                                 post {
                                     navController.navigate("${ROUTES.RideDetails.name}/$id")
+                                }
+                            }
+
+                            @JavascriptInterface
+                            fun onLocationUpdate(lat: Double, lng: Double) {
+                                post {
+                                    homeViewModel.updateLocation(lat, lng)
+                                    // Refresh rides if it's the first time we get location or if we want to re-filter
+                                    homeViewModel.refreshRides()
                                 }
                             }
                         }, "Android")
@@ -367,7 +382,8 @@ fun HomeScreen(
             BottomSheetContent(
                 navController  = navController,
                 onProfileClick = { navigateToProfile(null) },
-                avatarUrl      = profile?.avatar_url
+                avatarUrl      = profile?.avatar_url,
+                userType       = profile?.user_type ?: "passenger"
             )
         }
 
@@ -538,8 +554,11 @@ fun LiveFilterBar() {
 fun FilterPill(label: String, accent: Color, selected: Boolean) {
     Surface(
         shape  = RoundedCornerShape(20.dp),
-        color  = if (selected) accent.copy(alpha = 0.18f) else Cavern,
-        border = BorderStroke(1.dp, if (selected) accent.copy(alpha = 0.8f) else GlassEdge),
+        color  = if (selected) accent.copy(alpha = 0.22f) else Cavern,
+        border = BorderStroke(
+            width = if (selected) 1.5.dp else 1.dp,
+            color = if (selected) accent else accent.copy(alpha = 0.4f)
+        ),
         modifier = Modifier.height(32.dp)
     ) {
         Box(
@@ -549,8 +568,8 @@ fun FilterPill(label: String, accent: Color, selected: Boolean) {
             Text(
                 text       = label,
                 fontSize   = 12.sp,
-                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                color      = if (selected) accent else TextSecondary
+                fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.SemiBold,
+                color      = if (selected) Color.White else accent
             )
         }
     }
@@ -560,7 +579,7 @@ fun FilterPill(label: String, accent: Color, selected: Boolean) {
 // Bottom Sheet Content
 // ─────────────────────────────────────────────────────────────────────────────
 @Composable
-fun BottomSheetContent(navController: NavHostController, onProfileClick: () -> Unit, avatarUrl: String?) {
+fun BottomSheetContent(navController: NavHostController, onProfileClick: () -> Unit, avatarUrl: String?, userType: String = "passenger") {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -615,7 +634,7 @@ fun BottomSheetContent(navController: NavHostController, onProfileClick: () -> U
         ) {
             StatsRow()
             SearchBarSection(navController)
-            ActionCardsRow(navController)
+            ActionCardsRow(navController, userType)
             QuickInfoGrid()
             Spacer(modifier = Modifier.height(NAV_HEIGHT + 8.dp))
         }
@@ -697,20 +716,22 @@ fun SearchBarSection(navController: NavHostController) {
 // Action Cards Row
 // ─────────────────────────────────────────────────────────────────────────────
 @Composable
-fun ActionCardsRow(navController: NavHostController) {
+fun ActionCardsRow(navController: NavHostController, userType: String = "passenger") {
     Row(
         modifier              = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        ActionCard(
-            icon      = Icons.Default.Add,
-            title     = "Post Ride",
-            subtitle  = "Share your seats",
-            accent    = CyanPrimary,
-            glowColor = CyanGlow,
-            onClick   = { navController.navigate(ROUTES.PostRide.name) },
-            modifier  = Modifier.weight(1f)
-        )
+        if (userType.lowercase() == "driver") {
+            ActionCard(
+                icon      = Icons.Default.Add,
+                title     = "Post Ride",
+                subtitle  = "Share your seats",
+                accent    = CyanPrimary,
+                glowColor = CyanGlow,
+                onClick   = { navController.navigate(ROUTES.PostRide.name) },
+                modifier  = Modifier.weight(1f)
+            )
+        }
         ActionCard(
             icon      = Icons.Default.Search,
             title     = "Find Ride",
@@ -718,7 +739,7 @@ fun ActionCardsRow(navController: NavHostController) {
             accent    = CoralPrimary,
             glowColor = CoralGlow,
             onClick   = { navController.navigate(ROUTES.FindRide.name) },
-            modifier  = Modifier.weight(1f)
+            modifier  = if (userType.lowercase() == "driver") Modifier.weight(1f) else Modifier.fillMaxWidth()
         )
     }
 }

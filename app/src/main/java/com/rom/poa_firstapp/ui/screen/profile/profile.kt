@@ -247,6 +247,7 @@ fun ProfileHero(
     var fullName    by remember(profile.full_name)    { mutableStateOf(profile.full_name) }
     var bio         by remember(profile.bio)          { mutableStateOf(profile.bio ?: "") }
     var phoneNumber by remember(profile.phone_number) { mutableStateOf(profile.phone_number ?: "") }
+    var userType    by remember(profile.user_type)    { mutableStateOf(profile.user_type) }
 
     Box(
         modifier = Modifier
@@ -336,18 +337,53 @@ fun ProfileHero(
                     } else {
                         Text(profile.full_name, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = TextHero)
                     }
-                    // Verified pill
-                    Row(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(CyanPrimary.copy(alpha = 0.12f))
-                            .border(1.dp, CyanPrimary.copy(alpha = 0.28f), RoundedCornerShape(20.dp))
-                            .padding(horizontal = 10.dp, vertical = 3.dp),
-                        verticalAlignment     = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Icon(Icons.Default.CheckCircle, null, tint = CyanPrimary, modifier = Modifier.size(12.dp))
-                        Text("Verified", fontSize = 11.sp, color = CyanPrimary, fontWeight = FontWeight.SemiBold)
+                    // Verified pill + User Type
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(CyanPrimary.copy(alpha = 0.12f))
+                                .border(1.dp, CyanPrimary.copy(alpha = 0.28f), RoundedCornerShape(20.dp))
+                                .padding(horizontal = 10.dp, vertical = 3.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.CheckCircle,
+                                null,
+                                tint = CyanPrimary,
+                                modifier = Modifier.size(12.dp)
+                            )
+                            Text(
+                                "Verified",
+                                fontSize = 11.sp,
+                                color = CyanPrimary,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(PurpleAccent.copy(alpha = 0.12f))
+                                .border(1.dp, PurpleAccent.copy(alpha = 0.28f), RoundedCornerShape(20.dp))
+                                .padding(horizontal = 10.dp, vertical = 3.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                if (profile.user_type == "driver") Icons.Default.DirectionsCar else Icons.Default.Person,
+                                null,
+                                tint = PurpleAccent,
+                                modifier = Modifier.size(12.dp)
+                            )
+                            Text(
+                                profile.user_type.replaceFirstChar { it.uppercase() },
+                                fontSize = 11.sp,
+                                color = PurpleAccent,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
                     }
                 }
             }
@@ -365,6 +401,38 @@ fun ProfileHero(
                     colors          = darkFieldColors()
                 )
                 Spacer(Modifier.height(8.dp))
+                
+                // User Type Selection
+                Text("I am a:", color = CyanPrimary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    listOf("passenger", "driver").forEach { type ->
+                        val isSelected = userType.lowercase() == type
+                        Surface(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(40.dp)
+                                .clickable { userType = type },
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isSelected) CyanPrimary.copy(alpha = 0.2f) else Cavern,
+                            border = BorderStroke(1.dp, if (isSelected) CyanPrimary else GlassEdge)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = type.replaceFirstChar { it.uppercase() },
+                                    color = if (isSelected) CyanPrimary else TextSecondary,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    fontSize = 13.sp
+                                )
+                            }
+                        }
+                    }
+                }
+                
+                Spacer(Modifier.height(8.dp))
+                
                 OutlinedTextField(
                     value         = bio,
                     onValueChange = { bio = it },
@@ -382,7 +450,12 @@ fun ProfileHero(
                             cleaned.length == 9       -> "254$cleaned"
                             else                      -> cleaned
                         }
-                        onProfileUpdate(profile.copy(full_name = fullName, bio = bio, phone_number = formatted))
+                        onProfileUpdate(profile.copy(
+                            full_name = fullName, 
+                            bio = bio, 
+                            phone_number = formatted,
+                            user_type = userType
+                        ))
                     },
                     modifier = Modifier.align(Alignment.End),
                     shape    = RoundedCornerShape(10.dp),
