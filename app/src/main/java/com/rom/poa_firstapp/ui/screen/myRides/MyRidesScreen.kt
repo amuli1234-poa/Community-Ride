@@ -135,6 +135,7 @@ fun MyRidesScreen(navController: NavController) {
     val driverRides = viewModel.driverRides
     val passengerRides = viewModel.passengerRides
     val rideBookings = viewModel.rideBookings
+    val userBookings = viewModel.userBookings
 
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -174,6 +175,7 @@ fun MyRidesScreen(navController: NavController) {
                                 ride = ride,
                                 isDriver = selectedTab == 0,
                                 bookings = rideBookings[ride.id] ?: emptyList(),
+                                userBooking = userBookings[ride.id],
                                 onClick = { navController.navigate("${ROUTES.RideDetails.name}/${ride.id}") },
                                 onEdit = { navController.navigate("${ROUTES.PostRide.name}?rideId=${ride.id}") },
                                 onDelete = { showDeleteDialog = ride.id },
@@ -406,6 +408,7 @@ fun MyRideCard(
     ride: Ride,
     isDriver: Boolean,
     bookings: List<BookingWithProfile> = emptyList(),
+    userBooking: com.rom.poa_firstapp.data.model.Booking? = null,
     onClick: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
@@ -553,6 +556,49 @@ fun MyRideCard(
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     RideInfoRow(Icons.Default.MyLocation, ride.pickup_location ?: "—", CyanPrimary)
                     RideInfoRow(Icons.Default.LocationOn, ride.destination ?: "—", CoralPrimary)
+                }
+
+                // Booking Status for Passenger
+                if (!isDriver && userBooking != null) {
+                    val bStatus = userBooking.status.lowercase()
+                    val bColor = if (bStatus == "confirmed") MintPrimary else GoldAccent
+                    
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        color = bColor.copy(alpha = 0.08f),
+                        border = BorderStroke(1.dp, bColor.copy(alpha = 0.2f))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Icon(
+                                    if (bStatus == "confirmed") Icons.Default.CheckCircle else Icons.Default.Info,
+                                    null,
+                                    tint = bColor,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    text = if (bStatus == "confirmed") "Booking Confirmed" else "Negotiation Pending",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = bColor
+                                )
+                            }
+                            
+                            if (userBooking.agreed_price != null) {
+                                Text(
+                                    text = "KES ${userBooking.agreed_price.toInt()}",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = TextHero
+                                )
+                            }
+                        }
+                    }
                 }
 
                 // Meta

@@ -9,4 +9,7 @@
     <color name="white">#FFFFFFFF</color>
     <color name="green_deep">#1A3A2A</color>
     <color name="green_mid">#2D6A4F</color>
+    <color name="abyss">#080C1C</color>
+    <color name="cyan_primary">#00E5FF</color>
+    <color name="purple_accent">#AA55FF</color>
 </resources>

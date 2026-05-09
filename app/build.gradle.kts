@@ -68,6 +68,8 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.play.services.location)
 
+    implementation(libs.androidx.constraintlayout)
+    implementation(libs.androidx.core.splashscreen.v101)
 
 //    testImplementation(libs.junit)
 //    androidTestImplementation(libs.androidx.junit)

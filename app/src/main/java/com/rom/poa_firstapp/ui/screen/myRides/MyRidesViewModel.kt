@@ -11,6 +11,9 @@ import com.rom.poa_firstapp.data.model.Ride
 import com.rom.poa_firstapp.data.repository.NotificationRepository
 import com.rom.poa_firstapp.data.repository.ProfileRepository
 import com.rom.poa_firstapp.data.repository.RideRepository
+import io.github.jan.supabase.realtime.PostgresAction
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 
 class MyRidesViewModel(
@@ -38,6 +41,9 @@ class MyRidesViewModel(
     var rideBookings by mutableStateOf<Map<String, List<BookingWithProfile>>>(emptyMap())
         private set
 
+    var userBookings by mutableStateOf<Map<String, com.rom.poa_firstapp.data.model.Booking>>(emptyMap())
+        private set
+
     var userType by mutableStateOf("passenger")
         private set
 
@@ -45,6 +51,14 @@ class MyRidesViewModel(
         loadUserProfile()
         refreshRides()
         loadUnreadCount()
+        observeBookings()
+    }
+
+    private fun observeBookings() {
+        if (userId == null) return
+        rideRepository.getBookingsFlow(userId)
+            .onEach { refreshRides() } // Refresh everything when a booking changes
+            .launchIn(viewModelScope)
     }
 
     private fun loadUserProfile() {
@@ -75,6 +89,10 @@ class MyRidesViewModel(
                 driverRides.forEach { ride ->
                     loadBookingsForRide(ride.id)
                 }
+
+                // Fetch user's own bookings (as passenger)
+                val bookings = rideRepository.getUserBookings(it)
+                userBookings = bookings.associateBy { it.ride_id }
                 
                 isLoading = false
             }

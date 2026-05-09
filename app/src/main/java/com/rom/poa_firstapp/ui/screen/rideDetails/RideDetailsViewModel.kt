@@ -34,16 +34,48 @@ class RideDetailsViewModel(
     var isBooking by mutableStateOf(false)
         private set
 
+    var hasBooked by mutableStateOf(false)
+        private set
+
     init {
         loadRide()
         observeRideChanges()
+        observeBookings()
     }
 
     private fun loadRide() {
         viewModelScope.launch {
             ride = rideRepository.getRideById(rideId)
+            checkIfBooked()
             fetchBookingsIfOwner()
             isLoading = false
+        }
+    }
+
+    private fun observeBookings() {
+        val currentUserId = SupabaseModule.client.auth.currentSessionOrNull()?.user?.id ?: return
+        rideRepository.getBookingsFlow(currentUserId)
+            .onEach { action ->
+                // Check if this booking belongs to the current ride
+                val booking = when(action) {
+                    is PostgresAction.Update -> action.decodeRecord<com.rom.poa_firstapp.data.model.Booking>()
+                    is PostgresAction.Insert -> action.decodeRecord<com.rom.poa_firstapp.data.model.Booking>()
+                    else -> null
+                }
+                
+                if (booking?.ride_id == rideId) {
+                    fetchBookingsIfOwner()
+                    checkIfBooked()
+                }
+            }
+            .launchIn(viewModelScope)
+    }
+
+    private fun checkIfBooked() {
+        val currentUserId = SupabaseModule.client.auth.currentSessionOrNull()?.user?.id ?: return
+        viewModelScope.launch {
+            val userBookings = rideRepository.getUserBookings(currentUserId)
+            hasBooked = userBookings.any { it.ride_id == rideId }
         }
     }
 
@@ -99,13 +131,32 @@ class RideDetailsViewModel(
         }
         viewModelScope.launch {
             isBooking = true
+            // Initial status is PENDING for negotiation
             val result = rideRepository.bookRide(r.id, userId)
             onResult(result)
             if (result.isSuccess) {
-                // Refresh local ride data to update seats_left
                 ride = rideRepository.getRideById(rideId)
             }
             isBooking = false
+        }
+    }
+
+    fun confirmNegotiatedPrice(bookingId: String, price: Double, onResult: (Result<Unit>) -> Unit = {}) {
+        viewModelScope.launch {
+            val result = rideRepository.updateBookingStatus(bookingId, "CONFIRMED", price)
+            if (result.isSuccess) {
+                fetchBookingsIfOwner()
+            }
+            onResult(result)
+        }
+    }
+
+    fun updateBookingStatus(bookingId: String, status: String) {
+        viewModelScope.launch {
+            val result = rideRepository.updateBookingStatus(bookingId, status)
+            if (result.isSuccess) {
+                fetchBookingsIfOwner()
+            }
         }
     }
 }

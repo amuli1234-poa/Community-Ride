@@ -4,9 +4,11 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class Booking(
-    val id: Int? = null,
+    val id: String? = null,
     val ride_id: String,
     val user_id: String,
-    val status: String,
-    val created_at: String? = null
+    val status: String = "PENDING", // PENDING, NEGOTIATING, CONFIRMED, CANCELLED
+    val agreed_price: Double? = null,
+    val created_at: String? = null,
+    val profiles: RiderProfile? = null
 )

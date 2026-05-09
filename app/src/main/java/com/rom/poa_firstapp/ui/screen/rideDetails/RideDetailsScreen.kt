@@ -7,7 +7,8 @@ import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
@@ -113,6 +114,7 @@ fun RideDetailsScreen(
     val ride = viewModel.ride
     val isLoading = viewModel.isLoading
     val isBooking = viewModel.isBooking
+    val hasBooked = viewModel.hasBooked
 
     Scaffold(
         topBar = {
@@ -238,6 +240,13 @@ fun RideDetailsScreen(
                                     },
                                     onProfile = {
                                         navController.navigate("${ROUTES.Profile.name}?profileId=${booking.user_id}")
+                                    },
+                                    onConfirmPrice = { price ->
+                                        viewModel.confirmNegotiatedPrice(booking.id, price) { result ->
+                                            if (result.isSuccess) {
+                                                Toast.makeText(context, "Price confirmed for ${booking.full_name}!", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
                                     }
                                 )
                             }
@@ -250,6 +259,7 @@ fun RideDetailsScreen(
                     ride      = r,
                     isBooking = isBooking,
                     isOwner   = currentUserId == r.rider_id,
+                    hasBooked = hasBooked,
                     onMessage = {
                         val rawPhone = r.rider_phone.filter { it.isDigit() }
                         val phone = when {
@@ -273,7 +283,24 @@ fun RideDetailsScreen(
                         if (currentUserId != null) {
                             viewModel.bookRide(currentUserId) { result ->
                                 if (result.isSuccess) {
-                                    Toast.makeText(context, "Ride booked successfully! 🚗", Toast.LENGTH_LONG).show()
+                                    // 1. Format phone and message for WhatsApp
+                                    val rawPhone = r.rider_phone.filter { it.isDigit() }
+                                    val phone = when {
+                                        rawPhone.startsWith("254") -> rawPhone
+                                        rawPhone.startsWith("0")   -> "254" + rawPhone.substring(1)
+                                        rawPhone.length == 9       -> "254$rawPhone"
+                                        else                       -> rawPhone
+                                    }
+                                    val text = "Hi ${r.rider_name}, I just booked a seat on your ride to ${r.destination}. Can we discuss the price?"
+                                    
+                                    // 2. Launch WhatsApp
+                                    try {
+                                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://api.whatsapp.com/send?phone=$phone&text=${Uri.encode(text)}")))
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "Ride booked! Open WhatsApp manually to negotiate.", Toast.LENGTH_LONG).show()
+                                    }
+
+                                    // 3. Navigate to My Rides
                                     navController.navigate(ROUTES.MyRides.name) {
                                         popUpTo(ROUTES.Home.name)
                                     }
@@ -284,6 +311,9 @@ fun RideDetailsScreen(
                         } else {
                             Toast.makeText(context, "Please login to book a ride", Toast.LENGTH_SHORT).show()
                         }
+                    },
+                    onViewMyRides = {
+                        navController.navigate(ROUTES.MyRides.name)
                     }
                 )
 
@@ -514,74 +544,135 @@ private fun RiderCard(ride: Ride, onViewProfile: () -> Unit) {
 private fun PassengerBookingCard(
     booking: com.rom.poa_firstapp.data.model.BookingWithProfile,
     onWhatsApp: () -> Unit,
-    onProfile: () -> Unit
+    onProfile: () -> Unit,
+    onConfirmPrice: (Double) -> Unit
 ) {
+    var priceInput by remember { mutableStateOf("") }
+    val isConfirmed = booking.status.lowercase() == "confirmed"
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
         onClick = onProfile,
         shape = RoundedCornerShape(16.dp),
         color = Cavern,
-        border = BorderStroke(1.dp, GlassEdge)
+        border = BorderStroke(1.dp, if (isConfirmed) MintPrimary.copy(alpha = 0.5f) else GlassEdge)
     ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Avatar
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(Crater)
-                    .border(1.dp, CyanPrimary.copy(alpha = 0.2f), CircleShape),
-                contentAlignment = Alignment.Center
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                if (booking.avatar_url != null) {
-                    AsyncImage(
-                        model = booking.avatar_url,
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
+                // Avatar
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(Crater)
+                        .border(1.dp, CyanPrimary.copy(alpha = 0.2f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (booking.avatar_url != null) {
+                        AsyncImage(
+                            model = booking.avatar_url,
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Icon(Icons.Default.Person, null, tint = TextSecondary, modifier = Modifier.size(20.dp))
+                    }
+                }
+                
+                Spacer(Modifier.width(12.dp))
+                
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        booking.full_name,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        color = if (isConfirmed) MintPrimary else TextPrimary
                     )
-                } else {
-                    Icon(Icons.Default.Person, null, tint = TextSecondary, modifier = Modifier.size(20.dp))
+                    Text(
+                        booking.status.uppercase(),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = when(booking.status.lowercase()) {
+                            "confirmed" -> MintPrimary
+                            else -> GoldAccent
+                        }
+                    )
+                }
+
+                if (isConfirmed && booking.agreed_price != null) {
+                    Text(
+                        "KES ${booking.agreed_price.toInt()}",
+                        color = MintPrimary,
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 16.sp,
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+                }
+
+                // WhatsApp Button
+                IconButton(
+                    onClick = onWhatsApp,
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(MintPrimary.copy(alpha = 0.1f))
+                ) {
+                    Icon(
+                        Icons.Default.Chat,
+                        contentDescription = "WhatsApp",
+                        tint = MintPrimary,
+                        modifier = Modifier.size(20.dp)
+                    )
                 }
             }
-            
-            Spacer(Modifier.width(12.dp))
-            
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    booking.full_name,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp,
-                    color = TextPrimary
-                )
-                Text(
-                    booking.status.uppercase(),
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = when(booking.status.lowercase()) {
-                        "confirmed" -> MintPrimary
-                        else -> GoldAccent
-                    }
-                )
-            }
 
-            // WhatsApp Button
-            IconButton(
-                onClick = onWhatsApp,
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(MintPrimary.copy(alpha = 0.1f))
-            ) {
-                Icon(
-                    Icons.Default.Chat,
-                    contentDescription = "WhatsApp",
-                    tint = MintPrimary,
-                    modifier = Modifier.size(20.dp)
-                )
+            if (!isConfirmed) {
+                Spacer(Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    TextField(
+                        value = priceInput,
+                        onValueChange = { if (it.all { char -> char.isDigit() || char == '.' }) priceInput = it },
+                        placeholder = { Text("Agreed Price (KES)", fontSize = 12.sp) },
+                        modifier = Modifier.weight(1f).height(48.dp),
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Abyss,
+                            unfocusedContainerColor = Abyss,
+                            focusedIndicatorColor = CyanPrimary,
+                            unfocusedIndicatorColor = GlassEdge,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary
+                        ),
+                        shape = RoundedCornerShape(8.dp),
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                    )
+                    
+                    Button(
+                        onClick = { 
+                            val price = priceInput.toDoubleOrNull()
+                            if (price != null && price > 0) {
+                                onConfirmPrice(price)
+                            } else {
+                                // Simple feedback for invalid input
+                                priceInput = ""
+                            }
+                        },
+                        enabled = priceInput.isNotEmpty(),
+                        colors = ButtonDefaults.buttonColors(containerColor = CyanPrimary),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.height(48.dp),
+                        contentPadding = PaddingValues(horizontal = 16.dp)
+                    ) {
+                        Text("Confirm", color = Abyss, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
+                }
             }
         }
     }
@@ -595,8 +686,10 @@ private fun ActionButtons(
     ride: Ride,
     isBooking: Boolean,
     isOwner: Boolean,
+    hasBooked: Boolean,
     onMessage: () -> Unit,
-    onBook: () -> Unit
+    onBook: () -> Unit,
+    onViewMyRides: () -> Unit
 ) {
     Row(
         modifier              = Modifier.fillMaxWidth(),
@@ -618,8 +711,8 @@ private fun ActionButtons(
 
         // Book button
         Button(
-            onClick  = onBook,
-            enabled  = !isBooking && !isOwner && ride.seats_left > 0 && ride.status != "completed" && ride.status != "cancelled",
+            onClick  = if (hasBooked) onViewMyRides else onBook,
+            enabled  = !isBooking && !isOwner && (hasBooked || (ride.seats_left > 0 && ride.status != "completed" && ride.status != "cancelled")),
             modifier = Modifier.weight(1.5f).height(52.dp),
             shape    = RoundedCornerShape(14.dp),
             colors   = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
@@ -629,7 +722,7 @@ private fun ActionButtons(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(
-                        if (!isOwner && ride.seats_left > 0 && ride.status != "completed" && ride.status != "cancelled")
+                        if (!isOwner && (hasBooked || (ride.seats_left > 0 && ride.status != "completed" && ride.status != "cancelled")))
                             Brush.linearGradient(listOf(CyanPrimary, MintPrimary), Offset(0f, 0f), Offset(Float.POSITIVE_INFINITY, 0f))
                         else
                             Brush.linearGradient(listOf(TextMuted, TextMuted)),
@@ -643,6 +736,7 @@ private fun ActionButtons(
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         val btnIcon = when {
                             isOwner -> Icons.Default.Person
+                            hasBooked -> Icons.Default.CheckCircle
                             ride.status == "completed" -> Icons.Default.CheckCircle
                             ride.status == "cancelled" -> Icons.Default.Block
                             ride.seats_left > 0 -> Icons.Default.RocketLaunch
@@ -650,6 +744,7 @@ private fun ActionButtons(
                         }
                         val btnText = when {
                             isOwner -> "Your Ride"
+                            hasBooked -> "View My Rides"
                             ride.status == "completed" -> "Completed"
                             ride.status == "cancelled" -> "Cancelled"
                             ride.seats_left > 0 -> "Book Now"

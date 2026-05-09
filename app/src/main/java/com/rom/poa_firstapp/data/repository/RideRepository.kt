@@ -32,11 +32,14 @@ interface RideRepository {
     suspend fun searchRides(query: String): List<Ride>
     suspend fun getUserRides(userId: String): List<Ride>
     suspend fun getUserBookedRides(userId: String): List<Ride>
+    suspend fun getUserBookings(userId: String): List<Booking>
     suspend fun cancelBooking(rideId: String, userId: String): Result<Unit>
     suspend fun deleteRide(rideId: String): Result<Unit>
     suspend fun updateRide(ride: Ride): Result<Unit>
     suspend fun updateRideStatus(rideId: String, status: String): Result<Unit>
+    suspend fun updateBookingStatus(bookingId: String, status: String, agreedPrice: Double? = null): Result<Unit>
     suspend fun getRideBookings(rideId: String): List<BookingWithProfile>
+    fun getBookingsFlow(userId: String): Flow<PostgresAction>
     suspend fun submitRating(rating: com.rom.poa_firstapp.data.model.Rating): Result<Unit>
 }
 
@@ -147,7 +150,7 @@ class RideRepositoryImpl(
             val booking = Booking(
                 ride_id = rideId,
                 user_id = userId,
-                status = "booked"
+                status = "PENDING"
             )
             supabaseClient.from("bookings").insert(booking)
             
@@ -200,30 +203,24 @@ class RideRepositoryImpl(
 
     override suspend fun getUserBookedRides(userId: String): List<Ride> {
         return try {
-            Log.d("RideRepo", "Fetching booked rides for user: $userId")
-            // 1. Get bookings for this user
-            val bookings = supabaseClient.from("bookings").select {
-                filter {
-                    eq("user_id", userId)
-                }
-            }.decodeList<Booking>()
-            
-            Log.d("RideRepo", "Found ${bookings.size} bookings")
-            
+            val bookings = getUserBookings(userId)
             val rideIds = bookings.map { it.ride_id }.distinct()
             if (rideIds.isEmpty()) return emptyList()
             
-            // 2. Get the actual ride details for those bookings
-            val rides = supabaseClient.from("rides").select {
-                filter {
-                    isIn("id", rideIds)
-                }
+            supabaseClient.from("rides").select {
+                filter { isIn("id", rideIds) }
             }.decodeList<Ride>()
-            
-            Log.d("RideRepo", "Successfully fetched ${rides.size} booked rides")
-            rides
         } catch (e: Exception) {
-            Log.e("RideRepo", "Error in getUserBookedRides", e)
+            emptyList()
+        }
+    }
+
+    override suspend fun getUserBookings(userId: String): List<Booking> {
+        return try {
+            supabaseClient.from("bookings").select {
+                filter { eq("user_id", userId) }
+            }.decodeList<Booking>()
+        } catch (e: Exception) {
             emptyList()
         }
     }
@@ -278,6 +275,22 @@ class RideRepositoryImpl(
         }
     }
 
+    override suspend fun updateBookingStatus(bookingId: String, status: String, agreedPrice: Double?): Result<Unit> {
+        return try {
+            supabaseClient.from("bookings").update({
+                set("status", status)
+                if (agreedPrice != null) {
+                    set("agreed_price", agreedPrice)
+                }
+            }) {
+                filter { eq("id", bookingId) }
+            }
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     override suspend fun getRideBookings(rideId: String): List<BookingWithProfile> {
         return try {
             // Fetch bookings first
@@ -298,18 +311,32 @@ class RideRepositoryImpl(
                 val profile = profiles.find { it.id == booking.user_id }
                 if (profile != null) {
                     BookingWithProfile(
-                        id = booking.id ?: 0,
+                        id = booking.id ?: "",
                         user_id = booking.user_id,
                         full_name = profile.full_name,
                         phone_number = profile.phone_number,
                         avatar_url = profile.avatar_url,
-                        status = booking.status
+                        status = booking.status,
+                        agreed_price = booking.agreed_price
                     )
                 } else null
             }
         } catch (e: Exception) {
             Log.e("RideRepo", "Error fetching bookings", e)
             emptyList()
+        }
+    }
+
+    override fun getBookingsFlow(userId: String): Flow<PostgresAction> {
+        val channel = supabaseClient.realtime.channel("bookings_channel_${java.util.UUID.randomUUID()}")
+        return channel.postgresChangeFlow<PostgresAction>(schema = "public") {
+            table = "bookings"
+            // We can't easily filter by user_id in postgresChangeFlow client-side without more complex setup,
+            // but we can listen to all and filter in the ViewModel.
+        }.onStart {
+            channel.subscribe()
+        }.onCompletion {
+            channel.unsubscribe()
         }
     }
 

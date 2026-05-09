@@ -1,26 +1,41 @@
 package com.rom.poa_firstapp
 
+import android.Manifest
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.navigation.compose.rememberNavController
+import com.rom.poa_firstapp.data.model.Notification
 import com.rom.poa_firstapp.data.remote.SupabaseModule
+import com.rom.poa_firstapp.data.repository.NotificationRepositoryImpl
 import com.rom.poa_firstapp.data.repository.ProfileRepositoryImpl
 import com.rom.poa_firstapp.ui.common.LoadingState
 import com.rom.poa_firstapp.ui.navigation.AppNavigation
 import com.rom.poa_firstapp.ui.navigation.ROUTES
 import com.rom.poa_firstapp.ui.theme.Poa_firstappTheme
 import io.github.jan.supabase.auth.auth
+import io.github.jan.supabase.realtime.PostgresAction
+import io.github.jan.supabase.realtime.decodeRecord
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
@@ -28,10 +43,10 @@ class MainActivity : ComponentActivity() {
         val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        createNotificationChannel()
 
         var startDestination by mutableStateOf<String?>(null)
         
-        // Keep the splash screen on-screen until the start destination is determined
         splashScreen.setKeepOnScreenCondition {
             startDestination == null
         }
@@ -40,51 +55,60 @@ class MainActivity : ComponentActivity() {
             Poa_firstappTheme {
                 val navController = rememberNavController()
                 val supabaseClient = SupabaseModule.client
+                val context = LocalContext.current
                 
                 val profileRepository = remember { ProfileRepositoryImpl(supabaseClient) }
+                val notificationRepository = remember { NotificationRepositoryImpl(supabaseClient) }
+
+                // Permission Launcher for Android 13+
+                val permissionLauncher = rememberLauncherForActivityResult(
+                    ActivityResultContracts.RequestPermission()
+                ) { isGranted ->
+                    if (!isGranted) {
+                        Toast.makeText(context, "Notifications disabled. You might miss booking updates.", Toast.LENGTH_SHORT).show()
+                    }
+                }
 
                 LaunchedEffect(Unit) {
-                    println("DEBUG: MainActivity LaunchedEffect started")
-                    try {
-                        val session = try {
-                            supabaseClient.auth.currentSessionOrNull()
-                        } catch (e: Exception) {
-                            println("DEBUG: Error getting session: ${e.message}")
-                            null
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                            permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                         }
-                        
-                        println("DEBUG: Current session: $session")
+                    }
+                }
+
+                // Real-time Notification Listener
+                LaunchedEffect(startDestination) {
+                    val userId = supabaseClient.auth.currentSessionOrNull()?.user?.id
+                    if (userId != null) {
+                        notificationRepository.getNotificationsFlow(userId).collectLatest { action ->
+                            if (action is PostgresAction.Insert) {
+                                val newNotification = action.decodeRecord<Notification>()
+                                showLocalNotification(context, newNotification)
+                            }
+                        }
+                    }
+                }
+
+                LaunchedEffect(Unit) {
+                    try {
+                        val session = supabaseClient.auth.currentSessionOrNull()
                         if (session == null) {
-                            println("DEBUG: No session, navigating to Onboarding")
                             startDestination = ROUTES.Onboarding.name
                         } else {
                             val userId = session.user?.id
-                            println("DEBUG: Session found, user ID: $userId")
                             if (userId != null) {
                                 val profile = withContext(Dispatchers.IO) {
-                                    try {
-                                        println("DEBUG: Fetching profile for $userId")
-                                        profileRepository.getProfile(userId)
-                                    } catch (e: Exception) {
-                                        println("DEBUG: Error fetching profile: ${e.message}")
-                                        null
-                                    }
+                                    profileRepository.getProfile(userId)
                                 }
-                                println("DEBUG: Profile result: $profile")
-                                startDestination = if (profile != null) {
-                                    ROUTES.Home.name
-                                } else {
-                                    ROUTES.ProfileSetup.name
-                                }
+                                startDestination = if (profile != null) ROUTES.Home.name else ROUTES.ProfileSetup.name
                             } else {
                                 startDestination = ROUTES.Onboarding.name
                             }
                         }
                     } catch (e: Exception) {
-                        println("DEBUG: Critical Error in session check: ${e.message}")
                         startDestination = ROUTES.Onboarding.name
                     }
-                    println("DEBUG: Final startDestination: $startDestination")
                 }
 
                 Surface(
@@ -103,5 +127,31 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val name = "Ride Notifications"
+            val descriptionText = "Notifications for bookings and price negotiations"
+            val importance = NotificationManager.IMPORTANCE_HIGH
+            val channel = NotificationChannel("ride_notifications", name, importance).apply {
+                description = descriptionText
+            }
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.createNotificationChannel(channel)
+        }
+    }
+
+    private fun showLocalNotification(context: Context, notification: Notification) {
+        val builder = NotificationCompat.Builder(context, "ride_notifications")
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle(notification.title)
+            .setContentText(notification.message)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
+            .setAutoCancel(true)
+
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager.notify(System.currentTimeMillis().toInt(), builder.build())
     }
 }

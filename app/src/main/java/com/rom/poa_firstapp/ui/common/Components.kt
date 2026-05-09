@@ -13,20 +13,47 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 @Composable
 fun LoadingState(modifier: Modifier = Modifier) {
     Box(
-        modifier = modifier.fillMaxSize().background(Color(0xFF080C1C)),
+        modifier = modifier
+            .fillMaxSize()
+            .background(Color(0xFF080C1C)),
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            CircularProgressIndicator(color = Color(0xFF00E5FF))
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(text = "Loading...", color = Color(0xFF00E5FF))
+            // Replicating the Home Screen top brand style
+            Text(
+                text = buildAnnotatedString {
+                    withStyle(
+                        SpanStyle(
+                            brush = Brush.horizontalGradient(
+                                listOf(Color(0xFF00E5FF), Color(0xFFAA55FF))
+                            )
+                        )
+                    ) { append("COMMUNITY") }
+                    append(" ")
+                    withStyle(SpanStyle(color = Color.White)) { append("RIDE") }
+                },
+                fontSize = 24.sp,
+                fontWeight = FontWeight.ExtraBold,
+                letterSpacing = 2.sp
+            )
+            Spacer(modifier = Modifier.height(32.dp))
+            CircularProgressIndicator(
+                color = Color(0xFF00E5FF),
+                strokeWidth = 3.dp,
+                modifier = Modifier.size(32.dp)
+            )
         }
     }
 }

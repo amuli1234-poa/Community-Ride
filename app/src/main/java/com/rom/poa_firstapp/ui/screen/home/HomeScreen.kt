@@ -464,19 +464,8 @@ fun TopAppBarSection(onMenuClick: () -> Unit, onProfileClick: () -> Unit, avatar
             }
         }
 
-        // Brand name with gradient
-        Text(
-            text = buildAnnotatedString {
-                withStyle(SpanStyle(
-                    brush = Brush.horizontalGradient(listOf(CyanPrimary, PurpleAccent))
-                )) { append("COMMUNITY") }
-                append(" ")
-                withStyle(SpanStyle(color = TextHero)) { append("RIDE") }
-            },
-            fontSize      = 15.sp,
-            fontWeight    = FontWeight.ExtraBold,
-            letterSpacing = 1.5.sp
-        )
+        // Brand name with gradient removed as per user request
+        Spacer(modifier = Modifier.weight(1f))
 
         // Avatar / profile button
         Box(
