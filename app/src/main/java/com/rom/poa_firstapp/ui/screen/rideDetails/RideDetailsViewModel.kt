@@ -37,6 +37,9 @@ class RideDetailsViewModel(
     var hasBooked by mutableStateOf(false)
         private set
 
+    var userBooking by mutableStateOf<com.rom.poa_firstapp.data.model.Booking?>(null)
+        private set
+
     init {
         loadRide()
         observeRideChanges()
@@ -75,7 +78,8 @@ class RideDetailsViewModel(
         val currentUserId = SupabaseModule.client.auth.currentSessionOrNull()?.user?.id ?: return
         viewModelScope.launch {
             val userBookings = rideRepository.getUserBookings(currentUserId)
-            hasBooked = userBookings.any { it.ride_id == rideId }
+            userBooking = userBookings.find { it.ride_id == rideId }
+            hasBooked = userBooking != null
         }
     }
 

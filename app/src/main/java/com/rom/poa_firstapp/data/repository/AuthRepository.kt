@@ -11,6 +11,7 @@ interface AuthRepository {
     suspend fun signIn(email: String, password: String): Result<Unit>
     suspend fun signOut(): Result<Unit>
     suspend fun sendPasswordResetEmail(email: String): Result<Unit>
+    suspend fun updatePassword(newPassword: String): Result<Unit>
     fun isUserLoggedIn(): Boolean
     fun getCurrentUserId(): String?
 }
@@ -58,7 +59,21 @@ class AuthRepositoryImpl(
 
     override suspend fun sendPasswordResetEmail(email: String): Result<Unit> {
         return try {
-            supabaseClient.auth.resetPasswordForEmail(email)
+            supabaseClient.auth.resetPasswordForEmail(
+                email = email,
+                redirectUrl = "poaride://reset-password"
+            )
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun updatePassword(newPassword: String): Result<Unit> {
+        return try {
+            supabaseClient.auth.updateUser {
+                password = newPassword
+            }
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)

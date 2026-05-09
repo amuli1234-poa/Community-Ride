@@ -78,6 +78,21 @@ class AuthViewModel(
         }
     }
 
+    fun updatePassword(newPassword: String) {
+        viewModelScope.launch {
+            isLoading = true
+            errorMessage = null
+            isSuccess = false
+            val result = authRepository.updatePassword(newPassword)
+            result.onSuccess {
+                isSuccess = true
+            }.onFailure {
+                errorMessage = it.localizedMessage ?: "Failed to update password"
+            }
+            isLoading = false
+        }
+    }
+
     fun clearState() {
         errorMessage = null
         successMessage = null

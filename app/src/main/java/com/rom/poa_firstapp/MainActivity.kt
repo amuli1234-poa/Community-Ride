@@ -22,6 +22,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import com.rom.poa_firstapp.data.model.Notification
 import com.rom.poa_firstapp.data.remote.SupabaseModule
@@ -39,22 +40,54 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
+    private var currentIntent by mutableStateOf<android.content.Intent?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
-        val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         createNotificationChannel()
 
+        currentIntent = intent
+
         var startDestination by mutableStateOf<String?>(null)
-        
-        splashScreen.setKeepOnScreenCondition {
-            startDestination == null
-        }
 
         setContent {
             Poa_firstappTheme {
                 val navController = rememberNavController()
                 val supabaseClient = SupabaseModule.client
+
+                LaunchedEffect(currentIntent, startDestination) {
+                    val uri = currentIntent?.data
+                    if (startDestination != null && uri?.scheme == "poaride" && uri?.host == "reset-password") {
+                        // If startDestination is already ResetPassword, let NavHost handle it (cold start case)
+                        if (startDestination == ROUTES.ResetPassword.name && navController.currentDestination == null) {
+                            return@LaunchedEffect
+                        }
+
+                        // For warm starts or cases where we need to switch screens, wait for graph to be ready
+                        repeat(10) {
+                            val hasGraph = try {
+                                navController.graph
+                                true
+                            } catch (e: Exception) {
+                                false
+                            }
+
+                            if (hasGraph) {
+                                if (navController.currentBackStackEntry?.destination?.route != ROUTES.ResetPassword.name) {
+                                    try {
+                                        navController.navigate(ROUTES.ResetPassword.name)
+                                    } catch (e: Exception) {
+                                        android.util.Log.e("MainActivity", "Navigation failed", e)
+                                    }
+                                }
+                                return@LaunchedEffect
+                            }
+                            kotlinx.coroutines.delay(100)
+                        }
+                    }
+                }
+
                 val context = LocalContext.current
                 
                 val profileRepository = remember { ProfileRepositoryImpl(supabaseClient) }
@@ -91,6 +124,13 @@ class MainActivity : ComponentActivity() {
                 }
 
                 LaunchedEffect(Unit) {
+                    // Check for deep link on cold start
+                    val uri = intent?.data
+                    if (uri?.scheme == "poaride" && uri?.host == "reset-password") {
+                        startDestination = ROUTES.ResetPassword.name
+                        return@LaunchedEffect
+                    }
+
                     try {
                         val session = supabaseClient.auth.currentSessionOrNull()
                         if (session == null) {
@@ -153,5 +193,11 @@ class MainActivity : ComponentActivity() {
 
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.notify(System.currentTimeMillis().toInt(), builder.build())
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        currentIntent = intent
     }
 }

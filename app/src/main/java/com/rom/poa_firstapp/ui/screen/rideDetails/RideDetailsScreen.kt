@@ -200,6 +200,57 @@ fun RideDetailsScreen(
                     navController.navigate("${ROUTES.Profile.name}?profileId=${r.rider_id}")
                 })
 
+                // My Booking section (for passengers who booked)
+                if (currentUserId != r.rider_id && viewModel.hasBooked && viewModel.userBooking != null) {
+                    val booking = viewModel.userBooking!!
+                    val isConfirmed = booking.status.lowercase() == "confirmed"
+                    val bColor = if (isConfirmed) MintPrimary else GoldAccent
+                    
+                    RDSectionLabel("MY BOOKING STATUS")
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        color = Cavern,
+                        border = BorderStroke(1.dp, bColor.copy(alpha = 0.3f))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Icon(
+                                        if (isConfirmed) Icons.Default.CheckCircle else Icons.Default.Pending,
+                                        null,
+                                        tint = bColor,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Text(
+                                        if (isConfirmed) "CONFIRMED" else "PENDING",
+                                        fontWeight = FontWeight.Black,
+                                        fontSize = 14.sp,
+                                        color = bColor,
+                                        letterSpacing = 1.sp
+                                    )
+                                }
+                                Text(
+                                    if (isConfirmed) "Your seat is reserved. See you at the pickup!" else "Waiting for the driver to confirm the price.",
+                                    fontSize = 12.sp,
+                                    color = TextSecondary
+                                )
+                            }
+                            
+                            if (booking.agreed_price != null) {
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text("PRICE", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TextSecondary)
+                                    Text("KES ${booking.agreed_price.toInt()}", color = bColor, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // Bookings section (only for owner)
                 if (currentUserId == r.rider_id) {
                     RDSectionLabel("BOOKED PASSENGERS (${viewModel.bookings.size})")

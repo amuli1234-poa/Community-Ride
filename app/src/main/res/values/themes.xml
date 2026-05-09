@@ -1,10 +1,19 @@
 <resources>
-    <style name="Theme.App.SplashScreen" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenBackground">#0A0A0A</item>
-        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_logo</item>
-        <item name="windowSplashScreenAnimationDuration">800</item>
-        <item name="postSplashScreenTheme">@style/Theme.Poa_firstapp</item>
+    <!-- Base application theme. -->
+    <style name="Theme.Poa_firstapp" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">#0A0A0A</item>
+        <item name="android:statusBarColor">#0A0A0A</item>
     </style>
 
-    <style name="Theme.Poa_firstapp" parent="android:Theme.Material.Light.NoActionBar"/>
+    <!-- Splash Screen Theme (This replaces the default Android icon) -->
+    <style name="Theme.App.Starting" parent="Theme.SplashScreen">
+        <!-- Matches your splash background color -->
+        <item name="windowSplashScreenBackground">#0A0A0A</item>
+
+        <!-- Sets your logo as the starting icon -->
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_car</item>
+
+        <!-- The theme to switch to after the splash screen disappears -->
+        <item name="postSplashScreenTheme">@style/Theme.Poa_firstapp</item>
+    </style>
 </resources>

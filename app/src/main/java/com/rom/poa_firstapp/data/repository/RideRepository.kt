@@ -150,18 +150,36 @@ class RideRepositoryImpl(
             val booking = Booking(
                 ride_id = rideId,
                 user_id = userId,
-                status = "PENDING"
+                status = "NEGOTIATING"
             )
             supabaseClient.from("bookings").insert(booking)
             
             // Decrement seats_left in the rides table
             val ride = getRideById(rideId)
-            if (ride != null && ride.seats_left > 0) {
-                supabaseClient.from("rides").update({
-                    set("seats_left", ride.seats_left - 1)
-                }) {
-                    filter { eq("id", rideId) }
+            if (ride != null) {
+                if (ride.seats_left > 0) {
+                    supabaseClient.from("rides").update({
+                        set("seats_left", ride.seats_left - 1)
+                    }) {
+                        filter { eq("id", rideId) }
+                    }
                 }
+
+                // Get passenger name for notification
+                val passenger = try {
+                    supabaseClient.from("profiles").select {
+                        filter { eq("id", userId) }
+                    }.decodeSingle<com.rom.poa_firstapp.data.model.RiderProfile>()
+                } catch (e: Exception) { null }
+
+                // Notify Driver
+                val notification = com.rom.poa_firstapp.data.model.Notification(
+                    user_id = ride.rider_id,
+                    title = "New Ride Booking",
+                    message = "${passenger?.full_name ?: "Someone"} has booked a seat for your ride to ${ride.destination}. Tap to negotiate price.",
+                    type = "booking"
+                )
+                supabaseClient.from("notifications").insert(notification)
             }
 
             Result.success(Unit)
@@ -227,15 +245,41 @@ class RideRepositoryImpl(
 
     override suspend fun cancelBooking(rideId: String, userId: String): Result<Unit> {
         return try {
-            supabaseClient.from("bookings").delete {
-                filter {
-                    eq("ride_id", rideId)
-                    eq("user_id", userId)
+            // We use an RPC call to handle both deleting the booking and incrementing the seat count.
+            // This is necessary because passengers usually don't have update permissions on the 'rides' table.
+            supabaseClient.postgrest.rpc(
+                function = "cancel_ride_booking",
+                parameters = mapOf(
+                    "p_ride_id" to rideId,
+                    "p_user_id" to userId
+                )
+            )
+
+            // Optional: Notify the driver (this can also be done via a DB trigger, but we'll keep it here for now)
+            try {
+                val ride = getRideById(rideId)
+                if (ride != null) {
+                    val passengerProfile = try {
+                        supabaseClient.from("profiles").select {
+                            filter { eq("id", userId) }
+                        }.decodeSingleOrNull<com.rom.poa_firstapp.data.model.RiderProfile>()
+                    } catch (e: Exception) { null }
+
+                    val notification = com.rom.poa_firstapp.data.model.Notification(
+                        user_id = ride.rider_id,
+                        title = "Booking Cancelled",
+                        message = "${passengerProfile?.full_name ?: "A passenger"} has cancelled their booking for your ride to ${ride.destination}.",
+                        type = "cancellation"
+                    )
+                    supabaseClient.from("notifications").insert(notification)
                 }
+            } catch (e: Exception) {
+                Log.e("RideRepo", "Notification failed after cancellation", e)
             }
+
             Result.success(Unit)
         } catch (e: Exception) {
-            Log.e("RideRepo", "Cancellation failed", e)
+            Log.e("RideRepo", "Cancellation failed via RPC", e)
             Result.failure(e)
         }
     }
@@ -277,6 +321,15 @@ class RideRepositoryImpl(
 
     override suspend fun updateBookingStatus(bookingId: String, status: String, agreedPrice: Double?): Result<Unit> {
         return try {
+            if (status == "CONFIRMED" && agreedPrice == null) {
+                return Result.failure(Exception("Cannot confirm booking without an agreed price"))
+            }
+
+            // Get booking details to find out who to notify
+            val bookingResponse = supabaseClient.from("bookings").select {
+                filter { eq("id", bookingId) }
+            }.decodeSingle<Booking>()
+
             supabaseClient.from("bookings").update({
                 set("status", status)
                 if (agreedPrice != null) {
@@ -285,6 +338,19 @@ class RideRepositoryImpl(
             }) {
                 filter { eq("id", bookingId) }
             }
+
+            // Notify passenger if confirmed
+            if (status == "CONFIRMED") {
+                val ride = getRideById(bookingResponse.ride_id)
+                val notification = com.rom.poa_firstapp.data.model.Notification(
+                    user_id = bookingResponse.user_id,
+                    title = "Booking Confirmed!",
+                    message = "Your ride to ${ride?.destination ?: "destination"} has been confirmed at KES ${agreedPrice?.toInt()}.",
+                    type = "booking"
+                )
+                supabaseClient.from("notifications").insert(notification)
+            }
+
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)

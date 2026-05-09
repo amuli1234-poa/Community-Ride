@@ -5,9 +5,11 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.navDeepLink
 import com.rom.poa_firstapp.data.remote.SupabaseModule
 import com.rom.poa_firstapp.ui.screen.authentication.forgotpassword.ForgotPasswordScreen
 import com.rom.poa_firstapp.ui.screen.authentication.login.LoginScreen
+import com.rom.poa_firstapp.ui.screen.authentication.resetpassword.ResetPasswordScreen
 import com.rom.poa_firstapp.ui.screen.authentication.signup.SignupScreen
 import com.rom.poa_firstapp.ui.screen.onboarding.OnboardingScreen
 import com.rom.poa_firstapp.ui.screen.home.HomeScreen
@@ -69,6 +71,16 @@ fun AppNavigation(
         }
         composable(ROUTES.Notifications.name) {
             NotificationsScreen(navController)
+        }
+        composable(
+            route = ROUTES.ResetPassword.name,
+            deepLinks = listOf(
+                navDeepLink {
+                    uriPattern = "poaride://reset-password"
+                }
+            )
+        ) {
+            ResetPasswordScreen(navController)
         }
         composable(ROUTES.ProfileSetup.name) {
             val userId = SupabaseModule.client.auth.currentSessionOrNull()?.user?.id

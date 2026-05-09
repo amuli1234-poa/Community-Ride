@@ -74,7 +74,16 @@ fun NotificationsScreen(navController: NavController) {
     }
 
     LaunchedEffect(userId) {
+        if (userId == null) return@LaunchedEffect
+        
         loadNotifications()
+
+        // Listen for real-time notification changes
+        notificationRepository.getNotificationsFlow(userId)
+            .collect { 
+                // Refresh list when any change occurs in the notifications table
+                loadNotifications()
+            }
     }
 
     Scaffold(

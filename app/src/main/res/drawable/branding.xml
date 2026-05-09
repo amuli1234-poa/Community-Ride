@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="200dp"
+    android:height="60dp"
+    android:viewportWidth="200"
+    android:viewportHeight="60">
+
+    <!-- COMMUNITY -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M5,15 L5,45 Q5,50 10,50 Q15,50 15,45 L15,35 L20,35 L20,45 Q20,50 25,50 Q30,50 30,45 L30,15 Q30,10 25,10 Q20,10 20,15 L20,25 L15,25 L15,15 Q15,10 10,10 Q5,10 5,15 Z"/>
+
+</vector>

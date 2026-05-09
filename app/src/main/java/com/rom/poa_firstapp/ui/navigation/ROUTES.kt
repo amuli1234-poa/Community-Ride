@@ -14,4 +14,5 @@ enum class ROUTES {
     FindRide,
     MyRides,
     Notifications,
+    ResetPassword
 }

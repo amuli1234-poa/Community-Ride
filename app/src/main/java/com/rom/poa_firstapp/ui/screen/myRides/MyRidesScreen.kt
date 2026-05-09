@@ -668,6 +668,9 @@ fun PassengerRow(
     onWhatsApp: () -> Unit = {},
     onProfile: () -> Unit = {}
 ) {
+    val isConfirmed = booking.status.lowercase() == "confirmed"
+    val bColor = if (isConfirmed) MintPrimary else GoldAccent
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -702,7 +705,7 @@ fun PassengerRow(
         }
 
         Column(modifier = Modifier.weight(1f)) {
-            Text(booking.full_name, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = TextPrimary)
+            Text(booking.full_name, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = if (isConfirmed) MintPrimary else TextPrimary)
             Text(booking.phone_number ?: "No phone", fontSize = 12.sp, color = TextSecondary)
         }
 
@@ -711,6 +714,16 @@ fun PassengerRow(
                 Icon(Icons.Default.Star, contentDescription = "Rate Passenger", tint = GoldAccent, modifier = Modifier.size(20.dp))
             }
         } else {
+            if (isConfirmed && booking.agreed_price != null) {
+                Text(
+                    text = "KES ${booking.agreed_price.toInt()}",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MintPrimary,
+                    modifier = Modifier.padding(end = 4.dp)
+                )
+            }
+
             IconButton(
                 onClick = onWhatsApp,
                 modifier = Modifier
@@ -727,14 +740,14 @@ fun PassengerRow(
 
             Box(
                 modifier = Modifier
-                    .background(MintPrimary.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+                    .background(bColor.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
                     .padding(horizontal = 8.dp, vertical = 4.dp)
             ) {
                 Text(
                     booking.status.uppercase(),
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
-                    color = MintPrimary
+                    color = bColor
                 )
             }
         }

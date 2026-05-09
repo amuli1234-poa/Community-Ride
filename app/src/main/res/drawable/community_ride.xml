@@ -1,49 +1,35 @@
 <?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="200dp"
-    android:height="120dp"
-    android:viewportWidth="400"
-    android:viewportHeight="240">
+    android:width="280dp"
+    android:height="80dp"
+    android:viewportWidth="280"
+    android:viewportHeight="80">
 
-    <!-- Base background -->
+    <!-- COMMUNITY text line -->
     <path
-        android:fillColor="#0A0A0F"
-        android:pathData="M20,0 L380,0 Q400,0 400,20 L400,220 Q400,240 380,240 L20,240 Q0,240 0,220 L0,20 Q0,0 20,0 Z"/>
+        android:fillColor="#FFFFFF"
+        android:pathData="
+        M10,20 L10,55 L16,55 L16,42 L22,42 L22,55 L28,55 L28,20 L22,20 L22,36 L16,36 L16,20 Z
+        M32,20 L32,55 L44,55 L44,49 L38,49 L38,42 L43,42 L43,36 L38,36 L38,26 L44,26 L44,20 Z
+        M47,20 L47,55 L53,55 L53,36 L57,55 L61,55 L65,36 L65,55 L71,55 L71,20 L64,20 L59,38 L54,20 Z
+        M74,20 L74,55 L80,55 L80,20 Z
+        M83,20 L83,55 L89,55 L89,36 L96,55 L102,55 L102,20 L96,20 L96,38 L89,20 Z
+        M105,20 L105,55 L117,55 L117,49 L111,49 L111,42 L116,42 L116,36 L111,36 L111,26 L117,26 L117,20 Z
+        M120,20 L120,55 L132,55 L132,49 L126,49 L126,42 L131,42 L131,36 L126,36 L126,26 L132,26 L132,20 Z
+        M135,20 L135,55 Q135,62 142,62 Q149,62 149,55 L149,20 L143,20 L143,54 Q143,56 142,56 Q141,56 141,54 L141,20 Z
+        M152,20 L152,55 Q152,62 159,62 Q163,62 165,59 Q167,62 171,62 Q178,62 178,55 L178,20 L172,20 L172,54 Q172,56 171,56 Q170,56 170,54 L170,20 L164,20 L164,54 Q164,56 163,56 Q162,56 162,54 L162,20 Z
+        M181,37 A18,18 0 1,0 181,38 Z
+        M187,37 A12,12 0 1,1 187,38 Z"/>
 
-    <!-- Ghost wheel background -->
-    <path android:strokeColor="#1A1A26" android:strokeWidth="16"
-        android:fillColor="#00000000"
-        android:pathData="M328,40 A80,80 0 1,1 327.99,40 Z"/>
-    <path android:strokeColor="#1A1A26" android:strokeWidth="7"
-        android:fillColor="#00000000"
-        android:pathData="M328,90 A50,50 0 1,1 327.99,90 Z"/>
-    <path android:strokeColor="#1A1A26" android:strokeWidth="2"
-        android:fillColor="#00000000"
-        android:pathData="M328,40 L328,200 M248,120 L408,120 M271,63 L385,177 M385,63 L271,177"/>
-
-    <!-- Foreground accent wheel -->
-    <path android:strokeColor="#E63946" android:strokeWidth="2.5" android:strokeAlpha="0.7"
-        android:fillColor="#00000000"
-        android:pathData="M370,64 A56,56 0 1,1 369.99,64 Z"/>
-    <path android:strokeColor="#E63946" android:strokeWidth="1" android:strokeAlpha="0.4"
-        android:fillColor="#00000000"
-        android:pathData="M370,86 A34,34 0 1,1 369.99,86 Z"/>
-    <path android:fillColor="#E63946" android:fillAlpha="0.6"
-        android:pathData="M370,112 A8,8 0 1,1 369.99,112 Z"/>
-    <path android:fillColor="#0A0A0F"
-        android:pathData="M370,115.5 A4.5,4.5 0 1,1 369.99,115.5 Z"/>
-    <path android:strokeColor="#E63946" android:strokeWidth="1.5" android:strokeAlpha="0.5"
-        android:fillColor="#00000000"
-        android:pathData="M370,64 L370,176 M314,120 L426,120 M330,80 L410,160 M410,80 L330,160"/>
-
-    <!-- Left accent bars -->
-    <path android:fillColor="#E63946"
-        android:pathData="M0,52 Q2.5,52 2.5,54.5 L2.5,185.5 Q2.5,188 0,188 L-2.5,188 Q-5,188 -5,185.5 L-5,54.5 Q-5,52 -2.5,52 Z"/>
-    <path android:fillColor="#E63946" android:fillAlpha="0.35"
-        android:pathData="M8,68 Q9.5,68 9.5,69.5 L9.5,170.5 Q9.5,172 8,172 L6.5,172 Q5,172 5,170.5 L5,69.5 Q5,68 6.5,68 Z"/>
-
-    <!-- OFFICIAL tag -->
-    <path android:fillColor="#E63946" android:fillAlpha="0.15"
-        android:pathData="M22,16 Q22,12 26,12 L106,12 Q110,12 110,16 L110,30 Q110,34 106,34 L26,34 Q22,34 22,30 Z"/>
+    <!-- RIDE text line -->
+    <path
+        android:fillColor="#E63946"
+        android:pathData="
+        M10,68 L10,78 L13,78 Q17,78 17,73 Q17,68 13,68 Z
+        M12,70 L13,70 Q15,70 15,73 Q15,76 13,76 L12,76 Z
+        M19,68 L19,78 L21,78 L21,74 L22,74 L24,78 L26,78 L24,73 Q26,72 26,70 Q26,68 23,68 Z
+        M21,70 L23,70 Q24,70 24,71 Q24,72 23,72 L21,72 Z
+        M28,68 L28,78 L30,78 L30,68 Z
+        M32,68 L32,78 L38,78 L38,76 L34,76 L34,74 L37,74 L37,72 L34,72 L34,70 L38,70 L38,68 Z"/>
 
 </vector>

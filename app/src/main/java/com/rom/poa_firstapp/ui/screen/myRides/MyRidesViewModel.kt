@@ -52,6 +52,16 @@ class MyRidesViewModel(
         refreshRides()
         loadUnreadCount()
         observeBookings()
+        observeNotifications()
+    }
+
+    private fun observeNotifications() {
+        if (userId == null) return
+        notificationRepository.getNotificationsFlow(userId)
+            .onEach { 
+                loadUnreadCount() 
+            }
+            .launchIn(viewModelScope)
     }
 
     private fun observeBookings() {
@@ -78,10 +88,10 @@ class MyRidesViewModel(
         selectedTab = index
     }
 
-    fun refreshRides() {
+    fun refreshRides(showLoading: Boolean = true) {
         userId?.let {
             viewModelScope.launch {
-                isLoading = true
+                if (showLoading) isLoading = true
                 driverRides = rideRepository.getUserRides(it)
                 passengerRides = rideRepository.getUserBookedRides(it)
                 
@@ -94,7 +104,7 @@ class MyRidesViewModel(
                 val bookings = rideRepository.getUserBookings(it)
                 userBookings = bookings.associateBy { it.ride_id }
                 
-                isLoading = false
+                if (showLoading) isLoading = false
             }
         }
     }
@@ -123,15 +133,26 @@ class MyRidesViewModel(
     }
 
     suspend fun cancelBooking(rideId: String): Result<Unit> {
-        return if (userId != null) {
-            val result = rideRepository.cancelBooking(rideId, userId)
-            if (result.isSuccess) {
-                refreshRides()
-            }
-            result
+        if (userId == null) return Result.failure(Exception("User not logged in"))
+        
+        // Optimistic Update: Remove it from the UI immediately
+        val originalPassengerRides = passengerRides
+        val originalUserBookings = userBookings
+        
+        passengerRides = passengerRides.filter { it.id != rideId }
+        userBookings = userBookings - rideId
+        
+        val result = rideRepository.cancelBooking(rideId, userId)
+        
+        if (result.isSuccess) {
+            // Silent refresh in the background to sync with server
+            refreshRides(showLoading = false)
         } else {
-            Result.failure(Exception("User not logged in"))
+            // Rollback UI if the network request fails
+            passengerRides = originalPassengerRides
+            userBookings = originalUserBookings
         }
+        return result
     }
 
     suspend fun completeRide(rideId: String): Result<Unit> {
